@@ -8,7 +8,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.setPadding
 import com.example.timetable.data.Course
 import com.example.timetable.data.Session
 import com.example.timetable.data.Timetable

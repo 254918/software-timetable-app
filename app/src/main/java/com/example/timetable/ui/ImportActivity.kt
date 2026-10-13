@@ -1,7 +1,6 @@
 package com.example.timetable.ui
 
 import android.app.Activity
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -33,7 +32,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.InputStream
 
 /**
  * 导入课表：选图 → 选 OCR 引擎 → 识别 → 版面分析 → 专业选择 → 校正 → 生成课表。
