@@ -1,0 +1,17 @@
+// Gitee 在线构建兼容配置：Gradle 7.3.3 + AGP 7.0.4 + Kotlin 1.6.10 + Java 11
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "software-timetable-app"
+include ':app'

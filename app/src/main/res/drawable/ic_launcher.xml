@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- 课表图标：日历网格 + 课程色块 -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M8,4h32a4,4 0 0 1 4,4v32a4,4 0 0 1 -4,4h-32a4,4 0 0 1 -4,-4v-32a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,14h28v4h-28zM10,24h28v2h-28zM10,32h28v2h-28z" />
+    <path
+        android:fillColor="#FDE68A"
+        android:pathData="M14,18h12v6h-12z" />
+    <path
+        android:fillColor="#A7F3D0"
+        android:pathData="M28,18h6v6h-6z" />
+</vector>
