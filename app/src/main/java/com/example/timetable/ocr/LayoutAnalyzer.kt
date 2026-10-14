@@ -68,7 +68,7 @@ object LayoutAnalyzer {
             return when {
                 below != null && above != null -> (centers[below]!! + centers[above]!!) / 2
                 below != null -> centers[below]!! + (centers[below]!! - centerOfBelow(below, num))
-                else -> centers[above]!! - (centerOfAbove(above, num) - centers[above]!!)
+                else -> centers[above]!! - (centerOfAbove(above!!, num) - centers[above]!!)
             }
         }
 
