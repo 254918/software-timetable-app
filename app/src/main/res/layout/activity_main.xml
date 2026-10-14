@@ -27,6 +27,16 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/btnEdit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:text="编辑"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:background="?attr/selectableItemBackground" />
+
+        <TextView
             android:id="@+id/btnImport"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -161,6 +171,78 @@
             android:textSize="14sp"
             android:visibility="gone"
             android:lineSpacingExtra="6dp" />
+
+        <!-- 编辑模式：课程拖拽面板 -->
+        <LinearLayout
+            android:id="@+id/editPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="@color/card"
+            android:elevation="8dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingLeft="14dp"
+                android:paddingRight="8dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="课程列表 · 长按拖拽到课表空白处即可添加（调课）"
+                    android:textColor="@color/ink2"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/btnNewCourse"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:text="＋ 新建课程"
+                    android:textColor="@color/primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/bg_chip" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxHeight="180dp"
+                android:fillViewport="false">
+
+                <LinearLayout
+                    android:id="@+id/courseList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingLeft="14dp"
+                    android:paddingRight="14dp"
+                    android:paddingBottom="10dp" />
+            </ScrollView>
+
+            <TextView
+                android:id="@+id/editHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:paddingBottom="8dp"
+                android:text="提示：按住课表卡片上沿/下沿上下拖动，可调整该课的开始/结束节次"
+                android:textColor="#94A3B8"
+                android:textSize="10.5sp" />
+        </LinearLayout>
     </FrameLayout>
 
 </LinearLayout>

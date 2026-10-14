@@ -1,11 +1,14 @@
 package com.example.timetable.ui
 
+import android.content.ClipData
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.timetable.data.Course
@@ -21,6 +24,7 @@ class MainActivity : AppCompatActivity() {
 
     private var week = 1
     private var courses: List<Course> = emptyList()
+    private var editMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +38,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+        binding.btnEdit.setOnClickListener { toggleEditMode() }
 
         binding.btnPrev.setOnClickListener {
             if (week > 1) { week--; render() }
@@ -50,14 +55,27 @@ class MainActivity : AppCompatActivity() {
         binding.timetable.onCourseClick = { course, sess ->
             openCourseEdit(course, sess)
         }
+        binding.timetable.onDropAdd = { name, day, start, end ->
+            lastDroppedName = name
+            showDropDialog(day, start, end)
+        }
+        binding.timetable.onResizeCommit = { course, sess, newStart, newEnd ->
+            commitResize(course, sess, newStart, newEnd)
+        }
+        binding.btnNewCourse.setOnClickListener {
+            openCourseEdit(null, null)
+        }
 
         loadAndRender()
     }
 
     override fun onResume() {
         super.onResume()
-        // 导入/设置返回后刷新
-        if (::store.isInitialized) loadAndRender()
+        // 导入/设置/编辑返回后刷新
+        if (::store.isInitialized) {
+            loadAndRender()
+            rebuildCourseList()
+        }
     }
 
     private fun loadAndRender() {
@@ -76,10 +94,186 @@ class MainActivity : AppCompatActivity() {
 
     private fun render() {
         binding.weekLabel.text = weekLabelText(week)
-        binding.emptyView.visibility = if (courses.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
-        binding.timetable.visibility = if (courses.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
+        binding.emptyView.visibility = if (courses.isEmpty()) View.VISIBLE else View.GONE
+        binding.timetable.visibility = if (courses.isEmpty()) View.GONE else View.VISIBLE
         binding.timetable.setData(courses, week, store.termStart())
         renderWeekPanel()
+    }
+
+    // ===== 编辑模式 =====
+
+    private fun toggleEditMode() {
+        editMode = !editMode
+        binding.btnEdit.setTextColor(if (editMode) 0xFFFFD54F.toInt() else 0xFFFFFFFF.toInt())
+        binding.editPanel.visibility = if (editMode) View.VISIBLE else View.GONE
+        binding.timetable.editMode = editMode
+        if (editMode) rebuildCourseList()
+    }
+
+    /** 课程拖拽列表：去重后的课程名，长按拖到课表 */
+    private fun rebuildCourseList() {
+        binding.courseList.removeAllViews()
+        val names = courses.map { it.name }.distinct()
+        if (names.isEmpty()) {
+            val tv = TextView(this).apply {
+                text = "暂无课程"
+                setTextColor(0xFF94A3B8.toInt())
+                textSize = 12f
+                setPadding(0, dp(4), 0, dp(4))
+            }
+            binding.courseList.addView(tv)
+            return
+        }
+        names.forEach { name ->
+            val proto = courses.first { it.name == name }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(10), dp(8), dp(10), dp(8))
+                background = resources.getDrawable(R.drawable.bg_chip, theme)
+                setOnLongClickListener {
+                    val data = ClipData.newPlainText("course", name)
+                    startDragAndDrop(data, View.DragShadowBuilder(it), it, 0)
+                    true
+                }
+            }
+            val dot = TextView(this).apply {
+                text = "●"
+                textSize = 10f
+                setTextColor(Timetable.colorOf(name))
+                setPadding(0, 0, dp(8), 0)
+            }
+            val nameTv = TextView(this).apply {
+                text = name
+                setTextColor(0xFF0F172A.toInt())
+                textSize = 13.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            val meta = TextView(this).apply {
+                text = " ${proto.teacher} · ${roomCodeOf(proto.loc)}"
+                setTextColor(0xFF64748B.toInt())
+                textSize = 11f
+                setPadding(dp(6), 0, 0, 0)
+            }
+            row.addView(dot)
+            row.addView(nameTv)
+            row.addView(meta)
+            binding.courseList.addView(row)
+        }
+    }
+
+    /** 拖入课表后的周次/节次确认弹窗 */
+    private fun showDropDialog(day: Int, start: Int, end: Int) {
+        val etWeeks = EditText(this).apply {
+            setText("1-18")
+            hint = "如 1-18 / 4,6 / 9-13单"
+        }
+        val etStart = EditText(this).apply {
+            setText("$start")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val etEnd = EditText(this).apply {
+            setText("$end")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+        }
+        form.addView(fieldRow("周次", etWeeks))
+        form.addView(fieldRow("开始节次", etStart))
+        form.addView(fieldRow("结束节次", etEnd))
+
+        AlertDialog.Builder(this)
+            .setTitle("添加课程 · ${Timetable.DAY_NAMES[day - 1]}")
+            .setMessage("拖入的课程：${lastDroppedName ?: ""}\n确认周次与节次：")
+            .setView(form)
+            .setPositiveButton("添加") { _, _ ->
+                val weeks = etWeeks.text.toString().trim()
+                val s = etStart.text.toString().toIntOrNull()
+                val e = etEnd.text.toString().toIntOrNull()
+                if (weeks.isEmpty() || s == null || e == null || e < s) {
+                    Toast.makeText(this, "周次或节次不合法", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                addDroppedCourse(day, s, e, weeks)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun fieldRow(label: String, et: EditText): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        val lv = TextView(this).apply {
+            text = label
+            setTextColor(0xFF0F172A.toInt())
+            textSize = 14f
+            setPadding(0, 0, dp(10), 0)
+            layoutParams = LinearLayout.LayoutParams(dp(72), LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        row.addView(lv)
+        row.addView(et, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        return row
+    }
+
+    /** 把拖入的课程写入课表：同名同天课程追加 Session，否则新建课程 */
+    private fun addDroppedCourse(day: Int, start: Int, end: Int, weeks: String) {
+        val name = lastDroppedName ?: return
+        lastDroppedName = null
+        val proto = courses.firstOrNull { it.name == name }
+        val loc = proto?.loc ?: ""
+        val teacher = proto?.teacher ?: "未知教师"
+        val classes = proto?.classes
+
+        val list = store.loadCourses().toMutableList()
+        val idx = list.indexOfFirst { it.name == name && it.day == day }
+        val newSess = Session(weeks, start, end)
+        if (idx >= 0) {
+            val old = list[idx]
+            val exists = old.sessions.any { it.weeks == weeks }
+            val newSessions = if (exists) {
+                old.sessions.map { if (it.weeks == weeks) newSess else it }
+            } else old.sessions + newSess
+            list[idx] = old.copy(sessions = newSessions)
+        } else {
+            list.add(Course(name, day, classes, loc, teacher, listOf(newSess)))
+        }
+        store.saveCourses(list)
+        courses = list
+        rebuildCourseList()
+        render()
+        Toast.makeText(this, "已添加：${Timetable.DAY_NAMES[day - 1]} $start-$end 节", Toast.LENGTH_SHORT).show()
+    }
+
+    /** 记录最近一次拖入的课程名（onDropAdd 弹窗确认前暂存） */
+    private var lastDroppedName: String? = null
+
+    /** 卡片上下沿拖拽调整节次完成 */
+    private fun commitResize(course: Course, sess: Session, newStart: Int, newEnd: Int) {
+        if (newStart == sess.start && newEnd == sess.end) return
+        val list = store.loadCourses().toMutableList()
+        var changed = false
+        for (i in list.indices) {
+            val c = list[i]
+            if (c.name != course.name || c.day != course.day) continue
+            val ns = c.sessions.map { s ->
+                if (s.weeks == sess.weeks && s.start == sess.start && s.end == sess.end) {
+                    changed = true
+                    s.copy(start = newStart, end = newEnd)
+                } else s
+            }
+            list[i] = c.copy(sessions = ns)
+        }
+        if (changed) {
+            store.saveCourses(list)
+            courses = list
+            render()
+            Toast.makeText(this, "已调整为 $newStart-$newEnd 节", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun weekLabelText(w: Int): String {
@@ -168,21 +362,23 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun openCourseEdit(course: Course, sess: Session) {
+    private fun openCourseEdit(course: Course?, sess: Session?) {
         val intent = Intent(this, CourseEditActivity::class.java)
         intent.putExtra("course_json", courseToJson(course, sess))
         startActivity(intent)
     }
 
-    private fun courseToJson(course: Course, sess: Session): String {
+    private fun courseToJson(course: Course?, sess: Session?): String {
         val o = org.json.JSONObject()
-        o.put("name", course.name)
-        o.put("day", course.day)
-        o.put("loc", course.loc)
-        o.put("teacher", course.teacher)
-        o.put("weeks", sess.weeks)
-        o.put("start", sess.start)
-        o.put("end", sess.end)
+        if (course != null && sess != null) {
+            o.put("name", course.name)
+            o.put("day", course.day)
+            o.put("loc", course.loc)
+            o.put("teacher", course.teacher)
+            o.put("weeks", sess.weeks)
+            o.put("start", sess.start)
+            o.put("end", sess.end)
+        }
         return o.toString()
     }
 

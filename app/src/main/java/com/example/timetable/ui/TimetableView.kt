@@ -1,5 +1,7 @@
 package com.example.timetable.ui
 
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -11,6 +13,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
 import android.util.AttributeSet
+import android.view.DragEvent
 import android.view.MotionEvent
 import android.view.View
 import com.example.timetable.data.Course
@@ -23,6 +26,7 @@ import java.util.Calendar
  * - 节次列 + 周一至周五 5 列，随屏幕宽度自适应（无横向滚动）
  * - 上午 1-5 / 下午 6-9 / 晚上 10-13 分组
  * - 课程卡片按起止节次定位，教室编号白底深色粗体徽章
+ * - 编辑模式：卡片上下沿可拖拽调整节次；可接收从课程列表拖入的课程（调课添加）
  */
 class TimetableView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -31,7 +35,20 @@ class TimetableView @JvmOverloads constructor(
     private var courses: List<Course> = emptyList()
     private var week = 1
     private var termStart: Calendar = Calendar.getInstance()
+
+    /** 点击卡片（打开编辑表单） */
     var onCourseClick: ((Course, Session) -> Unit)? = null
+    /** 拖拽添加：从课程列表拖入到课表某天某节 */
+    var onDropAdd: ((name: String, day: Int, start: Int, end: Int) -> Unit)? = null
+    /** 卡片上下沿拖拽调整节次完成 */
+    var onResizeCommit: ((course: Course, sess: Session, newStart: Int, newEnd: Int) -> Unit)? = null
+
+    /** 编辑模式：显示拖拽手柄、接收拖入、允许调整节次 */
+    var editMode: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
 
     fun setData(courses: List<Course>, week: Int, termStart: Calendar) {
         this.courses = courses
@@ -62,6 +79,17 @@ class TimetableView @JvmOverloads constructor(
     }
 
     private fun gridTop(): Float = (pad + headH).toFloat()
+
+    private fun dayFromX(x: Float): Int {
+        val dayW = dayWidth()
+        val v = ((x - pad - periodW) / dayW).toInt() + 1
+        return v.coerceIn(1, 5)
+    }
+
+    private fun periodFromY(y: Float): Int {
+        val v = ((y - gridTop()) / rowH).toInt() + 1
+        return v.coerceIn(1, 13)
+    }
 
     private fun isToday(day: Int): Boolean {
         val now = Calendar.getInstance()
@@ -125,12 +153,26 @@ class TimetableView @JvmOverloads constructor(
         drawSeg(canvas, "下午", 0xFFFDF0E4.toInt(), 0xFFD97706.toInt(), y0 + 5 * rowH)
         drawSeg(canvas, "晚上", 0xFFF0EAF7.toInt(), 0xFF7C3AED.toInt(), y0 + 9 * rowH)
 
+        // 拖入预览：目标格高亮
+        if (dragTargetVisible && dragDay in 1..5 && dragPeriod in 1..13) {
+            val px = pad + periodW + (dragDay - 1) * dayW
+            val py = y0 + (dragPeriod - 1) * rowH
+            canvas.drawRect(px, py, px + dayW, py + rowH, Paint().apply { color = 0x332563EB.toInt() })
+        }
+
         // 课程卡片
         for (i in 0 until 5) {
             val dayX = pad + periodW + i * dayW
             val dayCourses = Timetable.coursesOfDay(courses, week, i + 1)
             for ((course, sess) in dayCourses) {
-                drawCourseCard(canvas, course, sess, dayX, dayW, y0)
+                // 拖拽调整节次中：用临时起止绘制预览
+                val rs = resize
+                val drawSess = if (rs != null && rs.course.name == course.name && rs.sess.weeks == sess.weeks &&
+                    rs.sess.start == sess.start && rs.sess.end == sess.end
+                ) {
+                    sess.copy(start = rs.newStart, end = rs.newEnd)
+                } else sess
+                drawCourseCard(canvas, course, drawSess, dayX, dayW, y0)
             }
         }
     }
@@ -260,6 +302,23 @@ class TimetableView @JvmOverloads constructor(
             canvas.save(); canvas.translate(x + padX, cursor); tSL.draw(canvas); canvas.restore()
         }
 
+        // 编辑模式：上下沿拖拽手柄
+        if (editMode) {
+            val handlePaint = Paint().apply { color = 0x66FFFFFF.toInt() }
+            val hx0 = x + dpf(10)
+            val hx1 = x + w - dpf(10)
+            // 上沿手柄
+            canvas.drawRoundRect(
+                RectF(hx0, top + dpf(3), hx1, top + dpf(8)),
+                dpf(3), dpf(3), handlePaint
+            )
+            // 下沿手柄
+            canvas.drawRoundRect(
+                RectF(hx0, top + h - dpf(8), hx1, top + h - dpf(3)),
+                dpf(3), dpf(3), handlePaint
+            )
+        }
+
         // 点击区域记录
         tapTargets = tapTargets.orEmpty() + TapTarget(rect, course, sess)
     }
@@ -274,7 +333,78 @@ class TimetableView @JvmOverloads constructor(
 
     private var tapTargets: List<TapTarget>? = null
 
+    // ===== 拖拽调整节次 =====
+
+    private data class ResizeState(
+        val course: Course, val sess: Session,
+        val mode: Int, // 0 = 上沿(改 start)，1 = 下沿(改 end)
+        var newStart: Int, var newEnd: Int
+    )
+
+    private var resize: ResizeState? = null
+
+    private fun findResizeHandle(x: Float, y: Float): ResizeState? {
+        if (!editMode) return null
+        val targets = tapTargets ?: return null
+        val hh = dp(16).toFloat()
+        for (t in targets) {
+            if (t.rect.contains(x, y)) {
+                if (y <= t.rect.top + hh) {
+                    return ResizeState(t.course, t.sess, 0, t.sess.start, t.sess.end)
+                }
+                if (y >= t.rect.bottom - hh) {
+                    return ResizeState(t.course, t.sess, 1, t.sess.start, t.sess.end)
+                }
+            }
+        }
+        return null
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (editMode) {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    val hit = findResizeHandle(event.x, event.y)
+                    if (hit != null) {
+                        resize = hit
+                        // 阻止父级(滚动容器)拦截本次手势
+                        (parent as? View)?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val rs = resize ?: return true
+                    if (rs.mode == 0) {
+                        rs.newStart = periodFromY(event.y).coerceIn(1, rs.newEnd)
+                    } else {
+                        rs.newEnd = periodFromY(event.y).coerceIn(rs.newStart, 13)
+                    }
+                    invalidate()
+                    return true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val rs = resize
+                    if (rs != null && event.action == MotionEvent.ACTION_UP) {
+                        onResizeCommit?.invoke(rs.course, rs.sess, rs.newStart, rs.newEnd)
+                    } else if (rs == null && event.action == MotionEvent.ACTION_UP) {
+                        // 未拖拽手柄：视为点击卡片，打开编辑表单
+                        val targets = tapTargets
+                        if (targets != null) {
+                            val hit = targets.firstOrNull { it.rect.contains(event.x, event.y) }
+                            if (hit != null) onCourseClick?.invoke(hit.course, hit.sess)
+                        }
+                    }
+                    resize = null
+                    (parent as? View)?.requestDisallowInterceptTouchEvent(false)
+                    invalidate()
+                    return true
+                }
+            }
+            return true
+        }
+
+        // 非编辑模式：点击卡片
         if (event.action == MotionEvent.ACTION_UP) {
             val targets = tapTargets ?: return super.onTouchEvent(event)
             val x = event.x
@@ -287,4 +417,51 @@ class TimetableView @JvmOverloads constructor(
         }
         return super.onTouchEvent(event)
     }
-}
+
+    // ===== 接收拖入（课程列表 -> 课表） =====
+
+    init {
+        setOnDragListener { v, e ->
+            when (e.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    val ok = e.clipDescription != null &&
+                        e.clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) && editMode
+                    if (ok) {
+                        dragTargetVisible = true
+                        invalidate()
+                    }
+                    ok
+                }
+                DragEvent.ACTION_DRAG_LOCATION -> {
+                    dragDay = dayFromX(e.x)
+                    dragPeriod = periodFromY(e.y)
+                    invalidate()
+                    true
+                }
+                DragEvent.ACTION_DROP -> {
+                    dragTargetVisible = false
+                    if (!editMode) return@setOnDragListener false
+                    val cs = e.clipData ?: return@setOnDragListener false
+                    val name = cs.getItemAt(0).text?.toString()
+                        ?: return@setOnDragListener false
+                    val day = dayFromX(e.x)
+                    val p = periodFromY(e.y)
+                    if (day in 1..5 && p in 1..13) {
+                        onDropAdd?.invoke(name, day, p, p)
+                    }
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENDED -> {
+                    dragTargetVisible = false
+                    invalidate()
+                    true
+                }
+                else -> true
+            }
+        }
+    }
+
+    /** 拖入预览：目标列/节次高亮 */
+    private var dragTargetVisible = false
+    private var dragDay = -1
+    private var dragPeriod = -1
