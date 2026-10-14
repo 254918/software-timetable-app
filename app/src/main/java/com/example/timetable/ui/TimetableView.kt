@@ -142,7 +142,7 @@ class TimetableView @JvmOverloads constructor(
 
         // 节次数字
         val numPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF64748B.toInt(); textSize = dpf(11); textAlign = Paint.Align.CENTER
+            color = 0xFF475569.toInt(); textSize = dpf(11); textAlign = Paint.Align.CENTER
         }
         for (n in 1..13) {
             val cy = y0 + (n - 1) * rowH + rowH / 2f + dpf(2)

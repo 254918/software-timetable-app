@@ -66,6 +66,18 @@ class MainActivity : AppCompatActivity() {
         binding.btnNewCourse.setOnClickListener {
             openCourseEdit(null, null)
         }
+        binding.btnLoadDefault.setOnClickListener {
+            val defaults = store.loadDefaultCourses()
+            if (defaults.isNotEmpty()) {
+                store.saveCourses(defaults)
+                courses = defaults
+                render()
+                rebuildCourseList()
+                Toast.makeText(this, "已加载内置课表（软件开发方向，共 ${defaults.map { it.name }.distinct().size} 门课）", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "内置课表加载失败", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         loadAndRender()
     }
@@ -118,7 +130,7 @@ class MainActivity : AppCompatActivity() {
         if (names.isEmpty()) {
             val tv = TextView(this).apply {
                 text = "暂无课程"
-                setTextColor(0xFF94A3B8.toInt())
+                setTextColor(0xFF64748B.toInt())
                 textSize = 12f
                 setPadding(0, dp(4), 0, dp(4))
             }
@@ -304,7 +316,7 @@ class MainActivity : AppCompatActivity() {
         if (binding.weekPanel.childCount == 0) {
             val empty = TextView(this).apply {
                 text = "本周无课"
-                setTextColor(0xFFB6C2D2.toInt())
+                setTextColor(0xFF64748B.toInt())
                 textSize = 12f
                 setPadding(dp(0), dp(6), dp(0), dp(0))
             }

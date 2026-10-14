@@ -49,13 +49,40 @@ class TimetableStore(private val context: Context) {
 
     /** 内置默认课表（assets/default_timetable.json），首次安装无课表时使用 */
     fun loadDefaultCourses(): List<Course> {
-        return try {
+        // 1) 优先读 assets 打包文件
+        try {
             val raw = context.assets.open("default_timetable.json").bufferedReader().use { it.readText() }
-            parseCourses(raw)
+            val parsed = parseCourses(raw)
+            if (parsed.isNotEmpty()) return parsed
         } catch (e: Exception) {
-            emptyList()
+            // 忽略，走内嵌兜底
         }
+        // 2) 内嵌 JSON 兜底（与网页课表数据一致，保证任何情况下初始课表可用）
+        return parseCourses(DEFAULT_TIMETABLE_JSON)
     }
+
+    /** 与网页课表（软件开发方向课表全屏版.html）完全一致的内置课表数据，含调课标记 */
+    private val DEFAULT_TIMETABLE_JSON = """
+[
+  {"name":"Web服务器端开发","day":1,"classes":"1、2班","loc":"B2-410 区块链与信息安全实验室","teacher":"金刚波","sessions":[{"weeks":"1-4,6-14,17-18","start":1,"end":4}]},
+  {"name":"软件工程综合实践","day":1,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"15-16","start":1,"end":4}]},
+  {"name":"Python程序设计","day":1,"classes":"1班","loc":"B2-409 智能硬件与物联网实验室","teacher":"刘欣","sessions":[{"weeks":"1-3","start":6,"end":9},{"weeks":"4-6双,7-14,17-18","start":6,"end":8}]},
+  {"name":"软件工程综合实践","day":1,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"16","start":6,"end":9}]},
+  {"name":"智能终端应用软件开发","day":2,"classes":"1、2班","loc":"B2-417 程序设计基础实验室","teacher":"徐志强","sessions":[{"weeks":"11-14,17-18","start":1,"end":4},{"weeks":"1-4,6-7,9-10","start":1,"end":5}]},
+  {"name":"软件工程综合实践","day":2,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"15-16","start":1,"end":5}]},
+  {"name":"软件体系结构与架构技术","day":2,"classes":"1班","loc":"B2-406 生成式AI创新实验室","teacher":"王亚洲","sessions":[{"weeks":"1","start":6,"end":9},{"weeks":"2-3,7","start":6,"end":13},{"weeks":"4","start":6,"end":9,"note":"原周二晚10-13节已调至第8周周四下午"},{"weeks":"6","start":6,"end":9,"note":"原周二晚10-13节已调至第9周周三晚上"}]},
+  {"name":"界面设计","day":2,"classes":"1班","loc":"B2-406 生成式AI创新实验室","teacher":"沈伊诺","sessions":[{"weeks":"9-14,17-18","start":6,"end":11}]},
+  {"name":"软件工程综合实践","day":3,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"15-16","start":1,"end":9}]},
+  {"name":"软件体系结构与架构技术","day":3,"classes":"1班","loc":"B2-406 生成式AI创新实验室","teacher":"王亚洲","sessions":[{"weeks":"1","start":6,"end":9},{"weeks":"9","start":10,"end":13,"makeup":true,"note":"由第6周周二晚调课补上"}]},
+  {"name":"Web服务器端开发","day":3,"classes":"1、2班","loc":"B2-410 区块链与信息安全实验室","teacher":"金刚波","sessions":[{"weeks":"18","start":10,"end":13}]},
+  {"name":"软件体系结构与架构技术","day":4,"classes":"1班","loc":"B2-406 生成式AI创新实验室","teacher":"王亚洲","sessions":[{"weeks":"8","start":6,"end":9,"makeup":true,"note":"由第4周周二晚调课补上"}]},
+  {"name":"形势与政策","day":4,"classes":"1、2班","loc":"B5-1-1楼102合班教室","teacher":"向丽丽","sessions":[{"weeks":"9-13单,17","start":6,"end":7}]},
+  {"name":"软件工程综合实践","day":4,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"15-16","start":6,"end":9}]},
+  {"name":"软件工程综合实践","day":5,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"16","start":1,"end":4}]},
+  {"name":"软件质量保证与测试","day":5,"classes":"1班","loc":"B2-406 生成式AI创新实验室","teacher":"赵煦华","sessions":[{"weeks":"1-2,5-11","start":6,"end":9},{"weeks":"12-14,18","start":6,"end":8}]},
+  {"name":"软件工程综合实践","day":5,"classes":"1班","loc":"B2-422 软件技术实验室","teacher":"胡绵发","sessions":[{"weeks":"15-16","start":6,"end":9}]}
+]
+""".trimIndent()
 
     private fun parseCourses(raw: String): List<Course> {
         return try {

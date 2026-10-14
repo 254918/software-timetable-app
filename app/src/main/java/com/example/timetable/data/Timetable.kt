@@ -83,16 +83,16 @@ object Timetable {
         return c
     }
 
-    /** 课程颜色：按名称分配调色板 */
+    /** 课程颜色：按名称分配调色板（统一加深，保证卡片白字对比度） */
     val PALETTE = listOf(
-        0xFF2563EB.toInt(), // 蓝
-        0xFF0891B2.toInt(), // 青
-        0xFF16A34A.toInt(), // 绿
-        0xFFEA580C.toInt(), // 橙
-        0xFFDB2777.toInt(), // 品红
-        0xFFB45309.toInt(), // 棕
-        0xFF64748B.toInt(), // 灰
-        0xFFDC2626.toInt()  // 红
+        0xFF1D4ED8.toInt(), // 蓝（深）
+        0xFF155E75.toInt(), // 青（深）
+        0xFF15803D.toInt(), // 绿（深）
+        0xFFC2410C.toInt(), // 橙（深）
+        0xFFBE185D.toInt(), // 品红（深）
+        0xFF92400E.toInt(), // 棕（深）
+        0xFF475569.toInt(), // 灰（深）
+        0xFFB91C1C.toInt()  // 红（深）
     )
 
     fun colorOf(name: String): Int {
