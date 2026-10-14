@@ -31,6 +31,13 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      - name: Restore release keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          echo "${{ secrets.TIMETABLE_KEYSTORE_B64 }}" | base64 -d > "$HOME/.android/timetable-release.keystore"
+          echo "TIMETABLE_KEYSTORE_PASS=${{ secrets.TIMETABLE_KEYSTORE_PASS }}" >> "$GITHUB_ENV"
+          echo "TIMETABLE_KEY_ALIAS=${{ secrets.TIMETABLE_KEY_ALIAS }}" >> "$GITHUB_ENV"
+
       - name: Build APKs
         run: |
           chmod +x gradlew
