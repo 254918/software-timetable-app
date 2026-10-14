@@ -16,12 +16,22 @@ android {
     }
 
     signingConfigs {
-        // 使用 debug 签名兜底，保证 release APK 也可直接安装（在线构建环境无正式 keystore）
+        // 固定发布签名：所有版本使用同一证书，保证覆盖安装不冲突
+        // 密钥文件优先读 ~/.android/timetable-release.keystore（GitHub Actions 从 Secret 解码，本地从 ~/.android 读取）
         release {
-            storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+            def ks = file("${System.getProperty('user.home')}/.android/timetable-release.keystore")
+            if (ks.exists()) {
+                storeFile ks
+                storePassword System.getenv('TIMETABLE_KEYSTORE_PASS') ?: 'timetable'
+                keyAlias System.getenv('TIMETABLE_KEY_ALIAS') ?: 'timetable'
+                keyPassword System.getenv('TIMETABLE_KEYSTORE_PASS') ?: 'timetable'
+            } else {
+                // 兜底：debug 签名（无固定密钥的本地环境）
+                storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
     }
 
