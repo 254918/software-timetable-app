@@ -368,7 +368,7 @@ class TimetableView @JvmOverloads constructor(
                     if (hit != null) {
                         resize = hit
                         // 阻止父级(滚动容器)拦截本次手势
-                        (parent as? View)?.requestDisallowInterceptTouchEvent(true)
+                        (parent as? android.view.ViewParent)?.requestDisallowInterceptTouchEvent(true)
                         return true
                     }
                     return true
@@ -396,7 +396,7 @@ class TimetableView @JvmOverloads constructor(
                         }
                     }
                     resize = null
-                    (parent as? View)?.requestDisallowInterceptTouchEvent(false)
+                    (parent as? android.view.ViewParent)?.requestDisallowInterceptTouchEvent(false)
                     invalidate()
                     return true
                 }
@@ -465,3 +465,4 @@ class TimetableView @JvmOverloads constructor(
     private var dragTargetVisible = false
     private var dragDay = -1
     private var dragPeriod = -1
+}

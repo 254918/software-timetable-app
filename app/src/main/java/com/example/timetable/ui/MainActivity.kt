@@ -15,6 +15,7 @@ import com.example.timetable.data.Course
 import com.example.timetable.data.Session
 import com.example.timetable.data.Timetable
 import com.example.timetable.data.TimetableStore
+import com.example.timetable.R
 import com.example.timetable.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
