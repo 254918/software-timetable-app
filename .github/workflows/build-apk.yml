@@ -81,6 +81,11 @@ jobs:
           if [ -z "$REL_ID" ]; then
             echo "WARNING: failed to get/create Gitee release, skip APK upload"; exit 0
           fi
-          curl -s --max-time 300 -X POST "https://gitee.com/api/v5/repos/$REPO/releases/$REL_ID/attach_files?access_token=$GITEE_TOKEN&name=app-release.apk" -F "file=@app/build/outputs/apk/release/app-release.apk" -o /tmp/gitee-rel.json -w "release upload http=%{http_code}\n" || echo "release upload failed"
-          curl -s --max-time 300 -X POST "https://gitee.com/api/v5/repos/$REPO/releases/$REL_ID/attach_files?access_token=$GITEE_TOKEN&name=app-debug.apk" -F "file=@app/build/outputs/apk/debug/app-debug.apk" -o /tmp/gitee-debug.json -w "debug upload http=%{http_code}\n" || echo "debug upload failed"
+          # 预热连通性
+          curl -s --max-time 30 -o /dev/null "https://gitee.com/api/v5/repos/$REPO/releases/tags/$TAG?access_token=$GITEE_TOKEN" || true
+          curl -s --max-time 900 --retry 3 --retry-all-errors --retry-delay 10 -X POST "https://gitee.com/api/v5/repos/$REPO/releases/$REL_ID/attach_files?access_token=$GITEE_TOKEN&name=app-release.apk" -F "file=@app/build/outputs/apk/release/app-release.apk" -o /tmp/gitee-rel.json -w "release upload http=%{http_code}\n" || echo "release upload failed"
+          curl -s --max-time 900 --retry 3 --retry-all-errors --retry-delay 10 -X POST "https://gitee.com/api/v5/repos/$REPO/releases/$REL_ID/attach_files?access_token=$GITEE_TOKEN&name=app-debug.apk" -F "file=@app/build/outputs/apk/debug/app-debug.apk" -o /tmp/gitee-debug.json -w "debug upload http=%{http_code}\n" || echo "debug upload failed"
+          # 校验附件是否上齐
+          CHECK=$(curl -s --max-time 30 "https://gitee.com/api/v5/repos/$REPO/releases/tags/$TAG?access_token=$GITEE_TOKEN")
+          echo "$CHECK" | python3 -c "import sys,json; d=json.load(sys.stdin); names=[a.get('name','') for a in d.get('assets',[])]; print('gitee assets:', names); sys.exit(0 if 'app-release.apk' in names and 'app-debug.apk' in names else 1)" || echo "WARNING: gitee assets incomplete"
           echo "SYNC DONE"
