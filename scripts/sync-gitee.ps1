@@ -44,8 +44,11 @@ if (-not $relId) {
     $relId = ($relJson | ConvertFrom-Json).id
 }
 Write-Host "Gitee release id: $relId"
+$cur = (curl.exe -s "https://gitee.com/api/v5/repos/$giteeRepo/releases/$relId`?access_token=$token" | ConvertFrom-Json)
+$haveNames = @($cur.assets | ForEach-Object { $_.name })
 
 foreach ($apk in $apks) {
+    if ($haveNames -contains $apk.Name) { Write-Host "skip $($apk.Name) (already uploaded)"; continue }
     Write-Host "uploading $($apk.Name) ..."
     $up = curl.exe -s -X POST "https://gitee.com/api/v5/repos/$giteeRepo/releases/$relId/attach_files?access_token=$token&name=$($apk.Name)" `
         -F "file=@$($apk.FullName)"
@@ -53,10 +56,8 @@ foreach ($apk in $apks) {
 }
 
 Write-Host "== 5/5 sync source (pull github, push gitee) =="
-git pull github master 2>$null | Out-Host
-if ($LASTEXITCODE -ne 0) { Write-Host "git pull github failed (code $LASTEXITCODE)" }
-git push origin master 2>$null | Out-Host
-if ($LASTEXITCODE -ne 0) { Write-Host "git push origin failed (code $LASTEXITCODE)" }
+cmd /c "git pull github master 2>&1" | Out-Host
+cmd /c "git push origin master 2>&1" | Out-Host
 
 Write-Host ""
 Write-Host "DONE. Gitee page: https://gitee.com/$giteeRepo/releases/tag/$tag"
