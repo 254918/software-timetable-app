@@ -43,6 +43,17 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug assembleRelease --no-daemon
 
+      - name: Verify signature (keystore vs apk)
+        run: |
+          echo "== release keystore file =="
+          ls -la "$HOME/.android/timetable-release.keystore"
+          echo "== release keystore cert fingerprint =="
+          keytool -list -v -keystore "$HOME/.android/timetable-release.keystore" -storepass "$TIMETABLE_KEYSTORE_PASS" -alias "$TIMETABLE_KEY_ALIAS" 2>&1 | grep -iE "SHA256:" | head -1
+          echo "== release apk cert fingerprint (apksigner) =="
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | tail -1)
+          if [ -z "$APKSIGNER" ]; then APKSIGNER=$(ls /usr/local/lib/android/sdk/build-tools/*/apksigner 2>/dev/null | tail -1); fi
+          if [ -z "$APKSIGNER" ]; then echo "apksigner not found"; else "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk; fi
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
