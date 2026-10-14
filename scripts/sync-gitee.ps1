@@ -2,7 +2,9 @@
 # 1) download latest APKs from GitHub Release, 2) upload to Gitee Release,
 # 3) sync local source (pull github -> push gitee).
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\sync-gitee.ps1
-# Prereq: gh CLI logged in; git remotes: origin=Gitee, github=GitHub.
+# Prereq: gh CLI logged in. Supports two layouts:
+#   A) origin=Gitee, github=GitHub (workspace layout)
+#   B) origin=GitHub, gitee=Gitee (clone-from-GitHub layout)
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -13,13 +15,24 @@ $tag = gh release list --repo 254918/software-timetable-app --limit 1 --json tag
 if (-not $tag) { Write-Host "no release found, abort"; exit 1 }
 Write-Host "latest tag: $tag"
 
-Write-Host "== 2/5 extract Gitee token from remote =="
-$origin = git remote get-url origin
-if ($origin -notmatch 'gitee') { Write-Host "origin is not Gitee remote"; exit 1 }
-$token = ($origin -split '@')[0] -split ':' | Select-Object -Last 1
-Write-Host "token length: $($token.Length)"
+Write-Host "== 2/5 detect remotes and extract Gitee token =="
+$remotes = @(git remote)
+$githubRemote = if ($remotes -contains "github") { "github" } else { "origin" }
+$giteeRemote = if ($remotes -contains "gitee") { "gitee" } else { "origin" }
+$giteeUrl = git remote get-url $giteeRemote
+if ($giteeUrl -notmatch 'gitee') { Write-Host "no Gitee remote found, abort"; exit 1 }
+if ($giteeUrl -match '@') {
+    $token = ($giteeUrl -split '@')[0] -split ':' | Select-Object -Last 1
+} else {
+    $token = $env:GITEE_TOKEN
+}
+if (-not $token) { Write-Host "cannot extract Gitee token, abort"; exit 1 }
+Write-Host "github remote: $githubRemote, gitee remote: $giteeRemote, token length: $($token.Length)"
 
-$giteeRepo = "Carl_Long/software-timetable-app"
+$m = [regex]::Match($giteeUrl, 'gitee\.com[:/]([^/]+/[^/\s]+?)(\.git)?$')
+if (-not $m.Success) { Write-Host "cannot parse Gitee repo from $giteeUrl"; exit 1 }
+$giteeRepo = $m.Groups[1].Value
+Write-Host "gitee repo: $giteeRepo"
 
 Write-Host "== 3/5 download APKs from GitHub =="
 $dlDir = Join-Path $env:TEMP "gitee-sync"
@@ -55,9 +68,9 @@ foreach ($apk in $apks) {
     Write-Host $up
 }
 
-Write-Host "== 5/5 sync source (pull github, push gitee) =="
-cmd /c "git pull github master 2>&1" | Out-Host
-cmd /c "git push origin master 2>&1" | Out-Host
+Write-Host "== 5/5 sync source (pull $githubRemote, push $giteeRemote) =="
+cmd /c "git pull $githubRemote master 2>&1" | Out-Host
+cmd /c "git push $giteeRemote master 2>&1" | Out-Host
 
 Write-Host ""
 Write-Host "DONE. Gitee page: https://gitee.com/$giteeRepo/releases/tag/$tag"
