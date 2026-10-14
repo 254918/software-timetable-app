@@ -49,44 +49,10 @@ jobs:
           ls -la "$HOME/.android/timetable-release.keystore"
           echo "== release keystore cert fingerprint =="
           keytool -list -v -keystore "$HOME/.android/timetable-release.keystore" -storepass "$TIMETABLE_KEYSTORE_PASS" -alias "$TIMETABLE_KEY_ALIAS" 2>&1 | grep -iE "SHA256:" | head -1
-          echo "== release apk cert fingerprint =="
-          python3 - <<'PYEOF'
-          import struct, hashlib
-          data = open("app/build/outputs/apk/release/app-release.apk","rb").read()
-          eocd = data.rfind(b"\x50\x4b\x05\x06")
-          cd_off = struct.unpack_from("<I", data, eocd+16)[0]
-          found = data.rfind(b"APK Sig Block 42", 0, cd_off)
-          blk_end = found
-          blk_start = blk_end - struct.unpack_from("<Q", data, blk_end-8)[0]
-          block = data[blk_start:blk_end]
-          pos = 8; cert = None
-          while pos < len(block)-24:
-              pid = struct.unpack_from("<I", block, pos)[0]
-              plen = struct.unpack_from("<I", block, pos+4)[0]
-              pval = block[pos+8:pos+8+plen]
-              if pid in (0x7109871a, 0xf05368c0):
-                  def take(buf, off):
-                      n = struct.unpack_from("<I", buf, off)[0]
-                      return buf[off+4:off+4+n], off+4+n
-                  def take_seq(buf, off):
-                      n = struct.unpack_from("<I", buf, off)[0]
-                      items=[]; p=off+4; end=off+4+n
-                      while p<end:
-                          it,p=take(buf,p); items.append(it)
-                      return items, off+4+n
-                  sd, off = take(pval, 0)
-                  dg, p = take_seq(sd, 0)
-                  sg, p = take_seq(sd, p)
-                  certs, p = take_seq(sd, p)
-                  if certs:
-                      cert = certs[0]; break
-              pos += 8 + plen
-          if cert:
-              fp = hashlib.sha256(cert).hexdigest().upper()
-              print("APK cert SHA256:", ":".join(fp[i:i+2] for i in range(0,len(fp),2)))
-          else:
-              print("APK cert not found")
-          PYEOF
+          echo "== release apk cert fingerprint (apksigner) =="
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | tail -1)
+          if [ -z "$APKSIGNER" ]; then APKSIGNER=$(ls /usr/local/lib/android/sdk/build-tools/*/apksigner 2>/dev/null | tail -1); fi
+          if [ -z "$APKSIGNER" ]; then echo "apksigner not found"; else "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk; fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
