@@ -162,13 +162,13 @@ class TimetableView @JvmOverloads constructor(
         val h = (sess.end - sess.start + 1) * rowH - dpf(4)
         if (w <= 0 || h <= 0) return
 
-        val color = Timetable.colorOf(course.name)
+        val cardColor = Timetable.colorOf(course.name)
         val rect = RectF(x, top, x + w, top + h)
         // 阴影
         val shadowRect = RectF(x + dpf(1), top + dpf(2), x + w + dpf(1), top + h + dpf(2))
         canvas.drawRoundRect(shadowRect, dpf(8), dpf(8), Paint().apply { color = 0x18000000.toInt() })
         // 卡片主体
-        canvas.drawRoundRect(rect, dpf(8), dpf(8), Paint().apply { color = color })
+        canvas.drawRoundRect(rect, dpf(8), dpf(8), Paint().apply { color = cardColor })
 
         // 内容区（留 padding）
         val padX = dpf(6)
