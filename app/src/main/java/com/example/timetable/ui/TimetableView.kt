@@ -43,6 +43,7 @@ class TimetableView @JvmOverloads constructor(
 
     private val density = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
+    private fun dpf(v: Int) = v * density
     private fun dpf(v: Float) = v * density
 
     private val pad = dp(8)
