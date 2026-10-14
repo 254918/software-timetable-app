@@ -56,3 +56,24 @@ jobs:
             自动构建的课表 App APK（软件开发方向）。
             - Debug 版与 Release 版均已签名，可直接安装
             - 功能：上传课表图片 OCR 识别、专业选择、手动校正、按周自动切换
+
+      - name: Sync APK to Gitee Release
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          TAG="v1.0.0-${{ github.run_number }}"
+          REPO="Carl_Long/software-timetable-app"
+          # 已存在同 tag 的 release 则复用，否则创建
+          REL_JSON=$(curl -s "https://gitee.com/api/v5/repos/$REPO/releases/tags/$TAG?access_token=$GITEE_TOKEN")
+          REL_ID=$(echo "$REL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+          if [ -z "$REL_ID" ]; then
+            REL_JSON=$(curl -s -X POST "https://gitee.com/api/v5/repos/$REPO/releases?access_token=$GITEE_TOKEN" \
+              --data-urlencode "tag_name=$TAG" \
+              --data-urlencode "name=timetable-app $TAG" \
+              --data-urlencode "target_commitish=master" \
+              --data-urlencode "body=auto built apk (GitHub Actions run ${{ github.run_number }})")
+            REL_ID=$(echo "$REL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          fi
+          echo "Gitee release id: $REL_ID"
+          curl -s -X POST "https://gitee.com/api/v5/repos/$REPO/releases/$REL_ID/attach_files?access_token=$GITEE_TOKEN&name=app-release.apk" -F "file=@app/build/outputs/apk/release/app-release.apk" -o /tmp/gitee-rel.json -w "release upload: %{http_code}\n"
+          curl -s -X POST "https://gitee.com/api/v5/repos/$REPO/releases/$REL_ID/attach_files?access_token=$GITEE_TOKEN&name=app-debug.apk" -F "file=@app/build/outputs/apk/debug/app-debug.apk" -o /tmp/gitee-debug.json -w "debug upload: %{http_code}\n"
