@@ -48,17 +48,7 @@ object LayoutAnalyzer {
 
         // 2) 13 个节次行的中心：缺失的节次用相邻插值
         val sortedNums = centers.keys.sorted()
-        fun centerOf(num: Int): Int {
-            if (centers.containsKey(num)) return centers[num]!!
-            val below = sortedNums.lastOrNull { it < num }
-            val above = sortedNums.firstOrNull { it > num }
-            return when {
-                below != null && above != null -> (centers[below]!! + centers[above]!!) / 2
-                below != null -> centers[below]!! + (centers[below]!! - centerOfBelow(below, num))
-                else -> centers[above]!! - (centerOfAbove(above, num) - centers[above]!!)
-            }
-        }
-        // 简单线性插值帮助函数
+        // 简单线性插值帮助函数（局部函数须先声明后使用）
         fun centerOfBelow(below: Int, num: Int): Int {
             val lb = sortedNums.lastOrNull { it < below }
             if (lb == null) return centers[below]!! - 40 * (num - below)
@@ -70,6 +60,16 @@ object LayoutAnalyzer {
             if (la == null) return centers[above]!! + 40 * (above - num)
             val step = (centers[la]!! - centers[above]!!) / (la - above)
             return centers[above]!! - step * (above - num)
+        }
+        fun centerOf(num: Int): Int {
+            if (centers.containsKey(num)) return centers[num]!!
+            val below = sortedNums.lastOrNull { it < num }
+            val above = sortedNums.firstOrNull { it > num }
+            return when {
+                below != null && above != null -> (centers[below]!! + centers[above]!!) / 2
+                below != null -> centers[below]!! + (centers[below]!! - centerOfBelow(below, num))
+                else -> centers[above]!! - (centerOfAbove(above, num) - centers[above]!!)
+            }
         }
 
         val rowCenter = (1..13).associateWith { centerOf(it) }
