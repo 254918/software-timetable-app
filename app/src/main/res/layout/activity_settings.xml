@@ -38,6 +38,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="number"
+                android:background="@drawable/bg_input"
+                android:padding="10dp"
+                android:textColor="@color/ink"
+                android:textColorHint="@color/ink2"
                 android:hint="年，如 2026" />
 
             <EditText
@@ -47,6 +51,10 @@
                 android:layout_weight="1"
                 android:layout_marginLeft="8dp"
                 android:inputType="number"
+                android:background="@drawable/bg_input"
+                android:padding="10dp"
+                android:textColor="@color/ink"
+                android:textColorHint="@color/ink2"
                 android:hint="月，如 9" />
 
             <EditText
@@ -56,6 +64,10 @@
                 android:layout_weight="1"
                 android:layout_marginLeft="8dp"
                 android:inputType="number"
+                android:background="@drawable/bg_input"
+                android:padding="10dp"
+                android:textColor="@color/ink"
+                android:textColorHint="@color/ink2"
                 android:hint="日，如 7" />
         </LinearLayout>
 
@@ -81,6 +93,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
+            android:background="@drawable/bg_input"
+            android:padding="10dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/ink2"
             android:hint="API Key（AK）"
             android:inputType="text" />
 
@@ -89,6 +105,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:background="@drawable/bg_input"
+            android:padding="10dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/ink2"
             android:hint="Secret Key（SK）"
             android:inputType="text" />
 
