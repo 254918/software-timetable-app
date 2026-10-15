@@ -83,21 +83,33 @@ object Timetable {
         return c
     }
 
-    /** 课程颜色：按名称分配调色板（统一加深，保证卡片白字对比度） */
+    /** 课程颜色：按首次出现顺序分配调色板（深色调保证白字对比度，16 色色相分散便于区分） */
     val PALETTE = listOf(
-        0xFF1D4ED8.toInt(), // 蓝（深）
-        0xFF155E75.toInt(), // 青（深）
-        0xFF15803D.toInt(), // 绿（深）
-        0xFFC2410C.toInt(), // 橙（深）
-        0xFFBE185D.toInt(), // 品红（深）
-        0xFF92400E.toInt(), // 棕（深）
-        0xFF475569.toInt(), // 灰（深）
-        0xFFB91C1C.toInt()  // 红（深）
+        0xFFB91C1C.toInt(), // 红
+        0xFFC2410C.toInt(), // 橙
+        0xFFB45309.toInt(), // 琥珀
+        0xFF4D7C0F.toInt(), // 橄榄绿
+        0xFF15803D.toInt(), // 绿
+        0xFF0F766E.toInt(), // 青绿
+        0xFF155E75.toInt(), // 青
+        0xFF0369A1.toInt(), // 天蓝
+        0xFF1D4ED8.toInt(), // 蓝
+        0xFF4338CA.toInt(), // 靛
+        0xFF6D28D9.toInt(), // 紫
+        0xFF86198F.toInt(), // 紫红
+        0xFFBE185D.toInt(), // 品红
+        0xFFA21CAF.toInt(), // 粉紫
+        0xFF9A3412.toInt(), // 栗棕
+        0xFF475569.toInt()  // 蓝灰
     )
 
+    /** 课程名 → 颜色：按首次出现顺序分配，保证每门课颜色不同且稳定（同课名同色） */
+    private val colorCache = LinkedHashMap<String, Int>()
+
     fun colorOf(name: String): Int {
-        var h = 0
-        for (ch in name) h = h * 31 + ch.code
-        return PALETTE[Math.floorMod(h, PALETTE.size)]
+        colorCache[name]?.let { return it }
+        val c = PALETTE[Math.floorMod(colorCache.size, PALETTE.size)]
+        colorCache[name] = c
+        return c
     }
 }
