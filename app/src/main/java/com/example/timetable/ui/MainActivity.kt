@@ -75,6 +75,9 @@ class MainActivity : AppCompatActivity() {
         binding.timetable.onDropZero = { name, day ->
             removeDroppedCourse(name, day)
         }
+        binding.timetable.onDropSession = { name, day, weeks, start, end ->
+            removeSession(name, day, weeks, start, end)
+        }
         binding.timetable.onResizeCommit = { course, sess, newStart, newEnd ->
             commitResize(course, sess, newStart, newEnd)
         }
@@ -338,6 +341,24 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "已设为0节（待保存）：${Timetable.DAY_NAMES[day - 1]} 不上「$name」", Toast.LENGTH_SHORT).show()
     }
 
+    /** 长按卡片拖到 0 节槽：删除本节课（该 Session），点保存才生效 */
+    private fun removeSession(name: String, day: Int, weeks: String, start: Int, end: Int) {
+        val draft = editDraft ?: return
+        val idx = draft.indexOfFirst { it.name == name && it.day == day }
+        if (idx < 0) {
+            Toast.makeText(this, "没找到这门课，无法删除", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val c = draft[idx]
+        val remain = c.sessions.filterNot {
+            it.weeks == weeks && it.start == start && it.end == end
+        }
+        if (remain.isEmpty()) draft.removeAt(idx) else draft[idx] = c.copy(sessions = remain)
+        render()
+        rebuildCourseList()
+        Toast.makeText(this, "已删除本节课（待保存）：${Timetable.DAY_NAMES[day - 1]}「$name」", Toast.LENGTH_SHORT).show()
+    }
+
     /** 记录最近一次拖入的课程名（onDropAdd 弹窗确认前暂存） */
     private var lastDroppedName: String? = null
 
@@ -473,6 +494,22 @@ class MainActivity : AppCompatActivity() {
             val oldWeeks = o.optString("old_weeks")
             val oldStart = o.optInt("old_start", 1)
             val oldEnd = o.optInt("old_end", 1)
+
+            // 编辑页点了「删除本节课」：从草稿移除该节课（点保存才生效）
+            if (o.optBoolean("delete_session", false)) {
+                val idx = draft.indexOfFirst { it.name == oldName && it.day == oldDay }
+                if (idx >= 0) {
+                    val c = draft[idx]
+                    val remain = c.sessions.filterNot {
+                        it.weeks == oldWeeks && it.start == oldStart && it.end == oldEnd
+                    }
+                    if (remain.isEmpty()) draft.removeAt(idx) else draft[idx] = c.copy(sessions = remain)
+                }
+                render()
+                rebuildCourseList()
+                Toast.makeText(this, "已删除本节课（待保存）", Toast.LENGTH_SHORT).show()
+                return
+            }
             val idx = draft.indexOfFirst { it.name == oldName && it.day == oldDay }
             val newSess = Session(o.optString("weeks"), o.optInt("start", 1), o.optInt("end", 1))
             if (idx >= 0) {

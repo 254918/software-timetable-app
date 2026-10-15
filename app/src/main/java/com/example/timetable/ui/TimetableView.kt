@@ -16,6 +16,7 @@ import android.util.AttributeSet
 import android.view.DragEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import com.example.timetable.data.Course
 import com.example.timetable.data.Session
 import com.example.timetable.data.Timetable
@@ -42,6 +43,8 @@ class TimetableView @JvmOverloads constructor(
     var onDropAdd: ((name: String, day: Int, start: Int, end: Int) -> Unit)? = null
     /** 拖到 0 节槽：表示该天不上该课（从课表移除该课程当天记录） */
     var onDropZero: ((name: String, day: Int) -> Unit)? = null
+    /** 长按已有卡片拖到 0 节槽：删除本节课（该 Session） */
+    var onDropSession: ((name: String, day: Int, weeks: String, start: Int, end: Int) -> Unit)? = null
     /** 卡片上下沿拖拽调整节次完成 */
     var onResizeCommit: ((course: Course, sess: Session, newStart: Int, newEnd: Int) -> Unit)? = null
 
@@ -406,6 +409,50 @@ class TimetableView @JvmOverloads constructor(
 
     private var resize: ResizeState? = null
 
+    // 长按卡片拖拽（编辑模式）：长按卡片中部 -> 拖动到 0 节槽 = 删除本节课
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var longPressTarget: TapTarget? = null
+    private var longPressPending = false
+    private var longPressTriggered = false
+    private var downX = 0f
+    private var downY = 0f
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+
+    private val longPressRunnable = Runnable {
+        val t = longPressTarget
+        if (longPressPending && t != null) {
+            longPressPending = false
+            longPressTriggered = true
+            val data = ClipData.newPlainText(
+                "course-sess",
+                "sess:${t.course.name}|${t.course.day}|${t.sess.weeks}|${t.sess.start}|${t.sess.end}"
+            )
+            val sw = t.rect.width().toInt()
+            val sh = t.rect.height().toInt()
+            val shadow = object : View.DragShadowBuilder(this@TimetableView) {
+                override fun onProvideShadowMetrics(size: android.graphics.Point, touch: android.graphics.Point) {
+                    size.set(sw, sh)
+                    touch.set((downX - t.rect.left).toInt(), (downY - t.rect.top).toInt())
+                }
+
+                override fun onDrawShadow(canvas: Canvas) {
+                    val color = Timetable.colorOf(t.course.name)
+                    canvas.drawRoundRect(
+                        RectF(0f, 0f, sw.toFloat(), sh.toFloat()), dpf(8), dpf(8),
+                        Paint().apply { color = color }
+                    )
+                    val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.WHITE; textSize = dpf(13); typeface = Typeface.DEFAULT_BOLD
+                    }
+                    val fm = p.fontMetrics
+                    canvas.drawText(t.course.name, dpf(8), sh / 2f - (fm.ascent + fm.descent) / 2, p)
+                }
+            }
+            startDragAndDrop(data, shadow, this@TimetableView, 0)
+            invalidate()
+        }
+    }
+
     private fun findResizeHandle(x: Float, y: Float): ResizeState? {
         if (!editMode) return null
         val targets = tapTargets ?: return null
@@ -442,24 +489,48 @@ class TimetableView @JvmOverloads constructor(
                         (parent as? android.view.ViewParent)?.requestDisallowInterceptTouchEvent(true)
                         return true
                     }
+                    // 非手柄区域：记录长按候选（长按=拖动卡片到0节槽删除；短按=点击编辑）
+                    val targets = tapTargets
+                    val tap = targets?.firstOrNull { it.rect.contains(event.x, event.y) }
+                    downX = event.x
+                    downY = event.y
+                    longPressPending = false
+                    longPressTriggered = false
+                    longPressTarget = null
+                    if (tap != null) {
+                        longPressTarget = tap
+                        longPressPending = true
+                        handler.postDelayed(longPressRunnable, 400)
+                    }
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val rs = resize ?: return true
-                    if (rs.mode == 0) {
-                        rs.newStart = periodFromY(event.y).coerceIn(1, rs.newEnd)
-                    } else {
-                        rs.newEnd = periodFromY(event.y).coerceIn(rs.newStart, 13)
+                    val rs = resize
+                    if (rs != null) {
+                        if (rs.mode == 0) {
+                            rs.newStart = periodFromY(event.y).coerceIn(1, rs.newEnd)
+                        } else {
+                            rs.newEnd = periodFromY(event.y).coerceIn(rs.newStart, 13)
+                        }
+                        invalidate()
+                    } else if (longPressPending) {
+                        // 手指移动超过阈值：取消长按候选
+                        val dx = event.x - downX
+                        val dy = event.y - downY
+                        if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) {
+                            longPressPending = false
+                            handler.removeCallbacks(longPressRunnable)
+                        }
                     }
-                    invalidate()
                     return true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     val rs = resize
-                    if (rs != null && event.action == MotionEvent.ACTION_UP) {
+                    val isUp = event.action == MotionEvent.ACTION_UP
+                    if (rs != null && isUp) {
                         onResizeCommit?.invoke(rs.course, rs.sess, rs.newStart, rs.newEnd)
-                    } else if (rs == null && event.action == MotionEvent.ACTION_UP) {
-                        // 未拖拽手柄：视为点击卡片，打开编辑表单
+                    } else if (rs == null && isUp && !longPressTriggered) {
+                        // 未拖手柄且未长按：视为点击卡片，打开编辑表单
                         val targets = tapTargets
                         if (targets != null) {
                             val hit = targets.firstOrNull { it.rect.contains(event.x, event.y) }
@@ -467,6 +538,10 @@ class TimetableView @JvmOverloads constructor(
                         }
                     }
                     resize = null
+                    longPressPending = false
+                    longPressTriggered = false
+                    longPressTarget = null
+                    handler.removeCallbacks(longPressRunnable)
                     (parent as? android.view.ViewParent)?.requestDisallowInterceptTouchEvent(false)
                     invalidate()
                     return true
@@ -513,14 +588,27 @@ class TimetableView @JvmOverloads constructor(
                     dragTargetVisible = false
                     if (!editMode) return@setOnDragListener false
                     val cs = e.clipData ?: return@setOnDragListener false
-                    val name = cs.getItemAt(0).text?.toString()
+                    val text = cs.getItemAt(0).text?.toString()
                         ?: return@setOnDragListener false
                     val day = dayFromX(e.x)
                     val p = periodFromY(e.y)
-                    if (day in 1..5 && p == 0) {
-                        onDropZero?.invoke(name, day)
-                    } else if (day in 1..5 && p in 1..13) {
-                        onDropAdd?.invoke(name, day, p, p)
+                    if (text.startsWith("sess:")) {
+                        // 长按卡片拖拽：拖到 0 节槽 = 删除本节课
+                        val parts = text.removePrefix("sess:").split("|")
+                        if (parts.size >= 5 && day in 1..5 && p == 0) {
+                            val wks = parts[2]
+                            val s = parts[3].toIntOrNull() ?: 1
+                            val en = parts[4].toIntOrNull() ?: 1
+                            onDropSession?.invoke(parts[0], day, wks, s, en)
+                        }
+                        // 拖到课表其他位置：暂不支持移动，忽略
+                    } else {
+                        // 课程列表拖入
+                        if (day in 1..5 && p == 0) {
+                            onDropZero?.invoke(text, day)
+                        } else if (day in 1..5 && p in 1..13) {
+                            onDropAdd?.invoke(text, day, p, p)
+                        }
                     }
                     true
                 }

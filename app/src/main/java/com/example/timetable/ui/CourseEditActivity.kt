@@ -102,5 +102,39 @@ class CourseEditActivity : AppCompatActivity() {
             Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
             finish()
         }
+
+        binding.btnDelete.setOnClickListener {
+            // 新课程（表单是空的）没有可删除的本节课
+            if (o.optString("name").isEmpty() && o.optInt("start", 1) == 1 && o.optString("weeks").isEmpty()) {
+                Toast.makeText(this, "新课程尚未创建，无可删除", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            // 编辑模式（commit_store=false）：返回删除标志，由主界面更新草稿
+            if (!intent.getBooleanExtra("commit_store", false)) {
+                val result = JSONObject()
+                result.put("delete_session", true)
+                result.put("old_name", o.optString("name"))
+                result.put("old_day", o.optInt("day", 1))
+                result.put("old_weeks", o.optString("weeks"))
+                result.put("old_start", o.optInt("start", 1))
+                result.put("old_end", o.optInt("end", 1))
+                setResult(RESULT_OK, Intent().putExtra("course_json", result.toString()))
+                finish()
+                return@setOnClickListener
+            }
+            // 非编辑模式：直接删除本节课并保存
+            val courses = store.loadCourses().toMutableList()
+            val idx = courses.indexOfFirst { it.name == o.optString("name") && it.day == o.optInt("day", 1) }
+            if (idx >= 0) {
+                val c = courses[idx]
+                val remain = c.sessions.filterNot {
+                    it.weeks == o.optString("weeks") && it.start == o.optInt("start") && it.end == o.optInt("end")
+                }
+                if (remain.isEmpty()) courses.removeAt(idx) else courses[idx] = c.copy(sessions = remain)
+                store.saveCourses(courses)
+            }
+            Toast.makeText(this, "已删除本节课", Toast.LENGTH_SHORT).show()
+            finish()
+        }
     }
 }

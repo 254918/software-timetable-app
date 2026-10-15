@@ -122,5 +122,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:text="保存修改" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDelete"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="删除本节课"
+            android:textColor="#DC2626" />
     </LinearLayout>
 </ScrollView>
