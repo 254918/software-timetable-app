@@ -70,7 +70,7 @@ class TimetableView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, pad + headH + rowH * 13 + pad)
+        setMeasuredDimension(w, rowH * 13 + pad * 2)
     }
 
     private fun dayWidth(): Float {
@@ -78,7 +78,7 @@ class TimetableView @JvmOverloads constructor(
         return (w - pad * 2 - periodW) / 5f
     }
 
-    private fun gridTop(): Float = (pad + headH).toFloat()
+    private fun gridTop(): Float = pad.toFloat()
 
     private fun dayFromX(x: Float): Int {
         val dayW = dayWidth()
@@ -256,7 +256,8 @@ class TimetableView @JvmOverloads constructor(
             val mkRect = RectF(x + padX, cursor, x + padX + mkW, cursor + dpf(14))
             canvas.drawRoundRect(mkRect, dpf(3), dpf(3), Paint().apply { color = 0xFFFDE68A.toInt() })
             val fm = mkPaint.fontMetrics
-            canvas.drawText(mkText, x + padX + (mkW - mkPaint.measureText(mkText)) / 2, cursor + dpf(14) - (dpf(14) - fm.ascent - fm.descent) / 2 - fm.ascent, mkPaint)
+            val mkBaseline = cursor + dpf(14) / 2f - (fm.ascent + fm.descent) / 2f
+            canvas.drawText(mkText, x + padX + (mkW - mkPaint.measureText(mkText)) / 2, mkBaseline, mkPaint)
             cursor += dpf(16)
         } else {
             cursor += dpf(2)
@@ -267,13 +268,15 @@ class TimetableView @JvmOverloads constructor(
         val locRest = course.loc.removePrefix(locCode).trim()
         roomPaint.textSize = dpf(11)
         roomPaint.typeface = Typeface.DEFAULT_BOLD
-        val badgeW = (roomPaint.measureText(locCode) + dpf(10)).toInt()
+        val textW = roomPaint.measureText(locCode)
+        val badgeW = (textW + dpf(10)).toInt()
         val badgeH = dpf(16)
         if (cursor + badgeH <= top + h) {
             val bRect = RectF(x + padX, cursor, x + padX + badgeW, cursor + badgeH)
             canvas.drawRoundRect(bRect, dpf(4), dpf(4), Paint().apply { color = 0xFFF2F2F2.toInt() })
             val fm = roomPaint.fontMetrics
-            canvas.drawText(locCode, x + padX + dpf(5), cursor + badgeH - (badgeH - fm.ascent - fm.descent) / 2 - fm.ascent, roomPaint)
+            val baseline = cursor + badgeH / 2f - (fm.ascent + fm.descent) / 2f
+            canvas.drawText(locCode, x + padX + (badgeW - textW) / 2f, baseline, roomPaint)
             // 后缀（白字单行）
             if (locRest.isNotEmpty() && x + padX + badgeW + dpf(4) < x + w - dpf(2)) {
                 val restPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
