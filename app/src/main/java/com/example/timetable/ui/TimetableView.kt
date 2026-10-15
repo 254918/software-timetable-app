@@ -116,11 +116,6 @@ class TimetableView @JvmOverloads constructor(
         val headPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFF0F172A.toInt(); textSize = dpf(14); typeface = Typeface.DEFAULT_BOLD
         }
-        val subPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF64748B.toInt(); textSize = dpf(12); typeface = Typeface.DEFAULT_BOLD
-        }
-        // 节次标题
-        drawCenterText(canvas, "节次", pad.toFloat(), pad.toFloat(), periodW.toFloat(), headH.toFloat(), subPaint)
         // 星期表头
         for (i in 0 until 5) {
             val x = pad + periodW + i * dayW
@@ -233,23 +228,23 @@ class TimetableView @JvmOverloads constructor(
         canvas.save(); canvas.translate(x + padX, cursor); nameSL.draw(canvas); canvas.restore()
         cursor += nameSL.height + dpf(2)
 
-        // 周次（不再显示节次；完整显示不省略，超高自动换行，两行放不下则缩小字号）
+        // 节次·周次（完整显示不省略，超高自动换行，两行放不下则缩小字号）
         textPaint.textSize = dpf(10)
         textPaint.typeface = Typeface.DEFAULT
-        val weeksText = "${sess.weeks}周"
+        val timeText = "${sess.start}-${sess.end}节 · ${sess.weeks}周"
         var wSize = dpf(10)
-        var weeksSL: StaticLayout
+        var timeSL: StaticLayout
         while (true) {
-            weeksSL = StaticLayout.Builder.obtain(weeksText, 0, weeksText.length, textPaint, innerW)
+            timeSL = StaticLayout.Builder.obtain(timeText, 0, timeText.length, textPaint, innerW)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .build()
-            if (weeksSL.lineCount <= 2 || wSize <= dpf(7.5f)) break
+            if (timeSL.lineCount <= 2 || wSize <= dpf(7.5f)) break
             wSize -= dpf(0.5f)
             textPaint.textSize = wSize
         }
-        if (cursor + weeksSL.height > top + h) return
-        canvas.save(); canvas.translate(x + padX, cursor); weeksSL.draw(canvas); canvas.restore()
-        cursor += weeksSL.height + dpf(2)
+        if (cursor + timeSL.height > top + h) return
+        canvas.save(); canvas.translate(x + padX, cursor); timeSL.draw(canvas); canvas.restore()
+        cursor += timeSL.height + dpf(2)
 
         // 调课徽章
         if (sess.makeup) {
