@@ -1,5 +1,6 @@
 package com.example.timetable.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Toast
