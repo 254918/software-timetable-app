@@ -27,6 +27,11 @@ class MainActivity : AppCompatActivity() {
     private var courses: List<Course> = emptyList()
     private var editMode = false
 
+    /** 编辑模式草稿：所有编辑操作先改内存草稿，点「保存修改」才写回存储 */
+    private var editDraft: MutableList<Course>? = null
+
+    private val REQ_EDIT_COURSE = 1001
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -39,7 +44,11 @@ class MainActivity : AppCompatActivity() {
         binding.btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        binding.btnEdit.setOnClickListener { toggleEditMode() }
+        binding.btnEdit.setOnClickListener {
+            if (editMode) exitEditMode(commit = false) else enterEditMode()
+        }
+        binding.btnSaveEdit.setOnClickListener { exitEditMode(commit = true) }
+        binding.btnDiscardEdit.setOnClickListener { exitEditMode(commit = false) }
 
         binding.btnPrev.setOnClickListener {
             if (week > 1) { week--; render() }
@@ -58,8 +67,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.timetable.onCourseClick = { course, sess ->
             openCourseEdit(course, sess)
-        }
-        binding.timetable.onDropAdd = { name, day, start, end ->
+        }        binding.timetable.onDropAdd = { name, day, start, end ->
             lastDroppedName = name
             showDropDialog(day, start, end)
         }
@@ -87,8 +95,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // 导入/设置/编辑返回后刷新
-        if (::store.isInitialized) {
+        // 导入/设置/编辑返回后刷新；编辑模式下保留草稿，不重载存储
+        if (::store.isInitialized && !editMode) {
             loadAndRender()
             rebuildCourseList()
         }
@@ -109,28 +117,52 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun render() {
+        val data = editDraft ?: courses
         binding.weekLabel.text = weekLabelText(week)
-        binding.emptyView.visibility = if (courses.isEmpty()) View.VISIBLE else View.GONE
-        binding.timetable.visibility = if (courses.isEmpty()) View.GONE else View.VISIBLE
-        binding.timetable.setData(courses, week, store.termStart())
+        binding.emptyView.visibility = if (data.isEmpty()) View.VISIBLE else View.GONE
+        binding.timetable.visibility = if (data.isEmpty()) View.GONE else View.VISIBLE
+        binding.timetable.setData(data, week, store.termStart())
         renderWeekPanel()
     }
 
     // ===== 编辑模式 =====
 
-    private fun toggleEditMode() {
-        editMode = !editMode
-        binding.btnEdit.setTextColor(if (editMode) 0xFFFFD54F.toInt() else 0xFFFFFFFF.toInt())
-        binding.editPanel.visibility = if (editMode) View.VISIBLE else View.GONE
-        binding.timetable.editMode = editMode
-        if (editMode) rebuildCourseList()
-        // 进入编辑模式：速览默认折叠，给课表腾出空间；退出时恢复展开
-        if (editMode) {
-            overviewCollapsed = true
-        } else {
-            overviewCollapsed = false
+    private fun enterEditMode() {
+        if (courses.isEmpty()) {
+            Toast.makeText(this, "请先加载课表（可点「加载内置课表」）", Toast.LENGTH_SHORT).show()
+            return
         }
+        editDraft = courses.toMutableList()
+        editMode = true
+        binding.btnEdit.text = "完成"
+        binding.btnEdit.setTextColor(0xFFFFD54F.toInt())
+        binding.editPanel.visibility = View.VISIBLE
+        binding.timetable.editMode = true
+        // 进入编辑模式：速览默认折叠，给课表腾出空间
+        overviewCollapsed = true
         applyOverviewState()
+        rebuildCourseList()
+        render()
+    }
+
+    private fun exitEditMode(commit: Boolean) {
+        val draft = editDraft
+        if (commit && draft != null) {
+            courses = draft.toList()
+            store.saveCourses(courses)
+            Toast.makeText(this, "已保存修改", Toast.LENGTH_SHORT).show()
+        } else if (commit) {
+            Toast.makeText(this, "没有可保存的修改", Toast.LENGTH_SHORT).show()
+        }
+        editDraft = null
+        editMode = false
+        binding.btnEdit.text = "编辑"
+        binding.btnEdit.setTextColor(0xFFFFFFFF.toInt())
+        binding.editPanel.visibility = View.GONE
+        binding.timetable.editMode = false
+        overviewCollapsed = false
+        applyOverviewState()
+        render()
     }
 
     // ===== 速览折叠 =====
@@ -150,7 +182,8 @@ class MainActivity : AppCompatActivity() {
     /** 课程拖拽列表：去重后的课程名，长按拖到课表 */
     private fun rebuildCourseList() {
         binding.courseList.removeAllViews()
-        val names = courses.map { it.name }.distinct()
+        val src = editDraft ?: courses
+        val names = src.map { it.name }.distinct()
         if (names.isEmpty()) {
             val tv = TextView(this).apply {
                 text = "暂无课程"
@@ -162,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         names.forEach { name ->
-            val proto = courses.first { it.name == name }
+            val proto = src.first { it.name == name }
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -257,45 +290,43 @@ class MainActivity : AppCompatActivity() {
         return row
     }
 
-    /** 把拖入的课程写入课表：同名同天课程追加 Session，否则新建课程 */
+    /** 把拖入的课程写入草稿：同名同天课程追加 Session，否则新建课程（点保存才生效） */
     private fun addDroppedCourse(day: Int, start: Int, end: Int, weeks: String) {
         val name = lastDroppedName ?: return
         lastDroppedName = null
-        val proto = courses.firstOrNull { it.name == name }
+        val draft = editDraft ?: return
+        val proto = draft.firstOrNull { it.name == name }
         val loc = proto?.loc ?: ""
         val teacher = proto?.teacher ?: "未知教师"
         val classes = proto?.classes
 
-        val list = store.loadCourses().toMutableList()
-        val idx = list.indexOfFirst { it.name == name && it.day == day }
+        val idx = draft.indexOfFirst { it.name == name && it.day == day }
         val newSess = Session(weeks, start, end)
         if (idx >= 0) {
-            val old = list[idx]
+            val old = draft[idx]
             val exists = old.sessions.any { it.weeks == weeks }
             val newSessions = if (exists) {
                 old.sessions.map { if (it.weeks == weeks) newSess else it }
             } else old.sessions + newSess
-            list[idx] = old.copy(sessions = newSessions)
+            draft[idx] = old.copy(sessions = newSessions)
         } else {
-            list.add(Course(name, day, classes, loc, teacher, listOf(newSess)))
+            draft.add(Course(name, day, classes, loc, teacher, listOf(newSess)))
         }
-        store.saveCourses(list)
-        courses = list
-        rebuildCourseList()
         render()
-        Toast.makeText(this, "已添加：${Timetable.DAY_NAMES[day - 1]} $start-$end 节", Toast.LENGTH_SHORT).show()
+        rebuildCourseList()
+        Toast.makeText(this, "已添加（待保存）：${Timetable.DAY_NAMES[day - 1]} $start-$end 节", Toast.LENGTH_SHORT).show()
     }
 
     /** 记录最近一次拖入的课程名（onDropAdd 弹窗确认前暂存） */
     private var lastDroppedName: String? = null
 
-    /** 卡片上下沿拖拽调整节次完成 */
+    /** 卡片上下沿拖拽调整节次完成：只改草稿，点保存才生效 */
     private fun commitResize(course: Course, sess: Session, newStart: Int, newEnd: Int) {
         if (newStart == sess.start && newEnd == sess.end) return
-        val list = store.loadCourses().toMutableList()
+        val draft = editDraft ?: return
         var changed = false
-        for (i in list.indices) {
-            val c = list[i]
+        for (i in draft.indices) {
+            val c = draft[i]
             if (c.name != course.name || c.day != course.day) continue
             val ns = c.sessions.map { s ->
                 if (s.weeks == sess.weeks && s.start == sess.start && s.end == sess.end) {
@@ -303,13 +334,11 @@ class MainActivity : AppCompatActivity() {
                     s.copy(start = newStart, end = newEnd)
                 } else s
             }
-            list[i] = c.copy(sessions = ns)
+            draft[i] = c.copy(sessions = ns)
         }
         if (changed) {
-            store.saveCourses(list)
-            courses = list
             render()
-            Toast.makeText(this, "已调整为 $newStart-$newEnd 节", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "已调整为 $newStart-$newEnd 节（待保存）", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -320,10 +349,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderWeekPanel() {
+        val data = editDraft ?: courses
         binding.panelTitle.text = "本周课程速览 · 第 $week 周"
         binding.weekPanel.removeAllViews()
         for (d in 1..5) {
-            val list = Timetable.coursesOfDay(courses, week, d)
+            val list = Timetable.coursesOfDay(data, week, d)
             if (list.isEmpty()) continue
             val head = TextView(this).apply {
                 text = "${Timetable.DAY_NAMES[d - 1]}（${list.size}门）"
@@ -402,7 +432,51 @@ class MainActivity : AppCompatActivity() {
     private fun openCourseEdit(course: Course?, sess: Session?) {
         val intent = Intent(this, CourseEditActivity::class.java)
         intent.putExtra("course_json", courseToJson(course, sess))
-        startActivity(intent)
+        // 编辑模式：返回结果由 MainActivity 更新草稿；非编辑模式：直接写存储
+        intent.putExtra("commit_store", !editMode)
+        startActivityForResult(intent, REQ_EDIT_COURSE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_EDIT_COURSE || resultCode != RESULT_OK || data == null) return
+        val raw = data.getStringExtra("course_json") ?: return
+        val draft = editDraft ?: return
+        try {
+            val o = org.json.JSONObject(raw)
+            val oldName = o.optString("old_name")
+            val oldDay = o.optInt("old_day", 1)
+            val oldWeeks = o.optString("old_weeks")
+            val oldStart = o.optInt("old_start", 1)
+            val oldEnd = o.optInt("old_end", 1)
+            val idx = draft.indexOfFirst { it.name == oldName && it.day == oldDay }
+            val newSess = Session(o.optString("weeks"), o.optInt("start", 1), o.optInt("end", 1))
+            if (idx >= 0) {
+                val old = draft[idx]
+                val newSessions = old.sessions.map { s ->
+                    if (s.weeks == oldWeeks && s.start == oldStart && s.end == oldEnd) {
+                        Session(newSess.weeks, newSess.start, newSess.end, s.makeup, s.note)
+                    } else s
+                }
+                draft[idx] = old.copy(
+                    name = o.optString("name"), day = o.optInt("day", oldDay),
+                    loc = o.optString("loc"), teacher = o.optString("teacher"),
+                    sessions = newSessions
+                )
+            } else {
+                draft.add(
+                    Course(
+                        name = o.optString("name"), day = o.optInt("day", oldDay),
+                        loc = o.optString("loc"), teacher = o.optString("teacher"),
+                        sessions = listOf(newSess)
+                    )
+                )
+            }
+            render()
+            rebuildCourseList()
+        } catch (e: Exception) {
+            // 解析失败静默，不破坏草稿
+        }
     }
 
     private fun courseToJson(course: Course?, sess: Session?): String {

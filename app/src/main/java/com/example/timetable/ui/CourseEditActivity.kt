@@ -56,6 +56,26 @@ class CourseEditActivity : AppCompatActivity() {
             }
             val newDay = binding.spDay.selectedItemPosition + 1
 
+            // 编辑模式（commit_store=false）：返回结果由主界面更新草稿，不直接写存储
+            if (!intent.getBooleanExtra("commit_store", false)) {
+                val result = JSONObject()
+                result.put("name", name)
+                result.put("day", newDay)
+                result.put("loc", loc)
+                result.put("teacher", teacher)
+                result.put("weeks", weeks)
+                result.put("start", start)
+                result.put("end", end)
+                result.put("old_name", o.optString("name"))
+                result.put("old_day", o.optInt("day", 1))
+                result.put("old_weeks", o.optString("weeks"))
+                result.put("old_start", o.optInt("start", 1))
+                result.put("old_end", o.optInt("end", 1))
+                setResult(RESULT_OK, Intent().putExtra("course_json", result.toString()))
+                finish()
+                return@setOnClickListener
+            }
+
             val courses = store.loadCourses().toMutableList()
             // 匹配同课程（名称+原星期）更新；否则新增
             val idx = courses.indexOfFirst { it.name == o.optString("name") && it.day == o.optInt("day", 1) }
