@@ -145,62 +145,68 @@
             android:paddingTop="6dp" />
     </LinearLayout>
 
-    <!-- 课表 -->
-    <FrameLayout
+    <!-- 课表 + 编辑面板（垂直排布，编辑面板不遮挡课表） -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:orientation="vertical">
 
-        <androidx.core.widget.NestedScrollView
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-            <com.example.timetable.ui.TimetableView
-                android:id="@+id/timetable"
+            <androidx.core.widget.NestedScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-        </androidx.core.widget.NestedScrollView>
+                android:layout_height="match_parent">
 
-        <LinearLayout
-            android:id="@+id/emptyView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:visibility="gone"
-            android:padding="24dp">
+                <com.example.timetable.ui.TimetableView
+                    android:id="@+id/timetable"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </androidx.core.widget.NestedScrollView>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <LinearLayout
+                android:id="@+id/emptyView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
                 android:gravity="center"
-                android:text="还没有课表\n点击右上角「导入课表」上传课表图片自动生成\n\n也可以先加载内置的软件开发方向课表"
-                android:textColor="@color/ink2"
-                android:textSize="14sp"
-                android:lineSpacingExtra="6dp" />
+                android:visibility="gone"
+                android:padding="24dp">
 
-            <TextView
-                android:id="@+id/btnLoadDefault"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:paddingLeft="20dp"
-                android:paddingRight="20dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:text="加载内置课表"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:background="@drawable/bg_chip_primary" />
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="还没有课表\n点击右上角「导入课表」上传课表图片自动生成\n\n也可以先加载内置的软件开发方向课表"
+                    android:textColor="@color/ink2"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="6dp" />
 
-        <!-- 编辑模式：课程拖拽面板 -->
+                <TextView
+                    android:id="@+id/btnLoadDefault"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:paddingLeft="20dp"
+                    android:paddingRight="20dp"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="10dp"
+                    android:text="加载内置课表"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:background="@drawable/bg_chip_primary" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- 编辑模式：课程拖拽面板（底部固定高度，不遮住课表） -->
         <LinearLayout
             android:id="@+id/editPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
             android:orientation="vertical"
             android:background="@color/card"
             android:elevation="8dp"
@@ -241,8 +247,7 @@
 
             <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:maxHeight="180dp"
+                android:layout_height="150dp"
                 android:fillViewport="false">
 
                 <LinearLayout
@@ -266,6 +271,6 @@
                 android:textColor="#64748B"
                 android:textSize="10.5sp" />
         </LinearLayout>
-    </FrameLayout>
+    </LinearLayout>
 
 </LinearLayout>

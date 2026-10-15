@@ -212,65 +212,69 @@ class TimetableView @JvmOverloads constructor(
         // 卡片主体
         canvas.drawRoundRect(rect, dpf(8), dpf(8), Paint().apply { color = cardColor })
 
-        // 内容区（留 padding）
+        // 内容区（留 padding）。行高一律用 fontMetrics 显式计算，杜绝重叠
         val padX = dpf(6)
-        val innerW = w - padX * 2
+        val innerW = (w - padX * 2).toInt()
         var cursor = top + dpf(6)
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         val roomPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1E293B.toInt() }
 
-        // 课程名
+        fun lineHeight(p: TextPaint): Float = p.fontMetrics.let { it.descent - it.ascent }
+
+        // 课程名（最多 2 行）
         textPaint.textSize = dpf(13)
         textPaint.typeface = Typeface.DEFAULT_BOLD
-        val nameSL = StaticLayout.Builder.obtain(course.name, 0, course.name.length, textPaint, innerW.toInt())
+        val nameSL = StaticLayout.Builder.obtain(course.name, 0, course.name.length, textPaint, innerW)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setMaxLines(2)
             .setEllipsize(TextUtils.TruncateAt.END)
             .build()
         if (cursor + nameSL.height > top + h) return
         canvas.save(); canvas.translate(x + padX, cursor); nameSL.draw(canvas); canvas.restore()
-        cursor += nameSL.height + dpf(3)
+        cursor += nameSL.height + dpf(2)
 
-        // 节次·周次 + 调课徽章
+        // 节次·周次（单行，超出省略）
         textPaint.textSize = dpf(10)
         textPaint.typeface = Typeface.DEFAULT
         val timeText = "${sess.start}-${sess.end}节 · ${sess.weeks}周"
-        val timeSL = StaticLayout.Builder.obtain(timeText, 0, timeText.length, textPaint, innerW.toInt())
+        val timeSL = StaticLayout.Builder.obtain(timeText, 0, timeText.length, textPaint, innerW)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-            .setMaxLines(2)
+            .setMaxLines(1)
             .setEllipsize(TextUtils.TruncateAt.END)
             .build()
         if (cursor + timeSL.height > top + h) return
         canvas.save(); canvas.translate(x + padX, cursor); timeSL.draw(canvas); canvas.restore()
+        cursor += timeSL.height + dpf(2)
+
         // 调课徽章
         if (sess.makeup) {
             val mkPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF92400E.toInt(); textSize = dpf(9); typeface = Typeface.DEFAULT_BOLD
             }
-            val mkW = mkPaint.measureText("调课") + dpf(8)
-            val mkW2 = minOf(mkW, innerW)
-            val mkRect = RectF(x + padX, cursor, x + padX + mkW2, cursor + dpf(14))
+            val mkText = "调课"
+            val mkW = minOf((mkPaint.measureText(mkText) + dpf(8)).toInt(), innerW)
+            val mkRect = RectF(x + padX, cursor, x + padX + mkW, cursor + dpf(14))
             canvas.drawRoundRect(mkRect, dpf(3), dpf(3), Paint().apply { color = 0xFFFDE68A.toInt() })
             val fm = mkPaint.fontMetrics
-            canvas.drawText("调课", x + padX + (mkW2 - mkPaint.measureText("调课")) / 2, cursor + dpf(14) - (dpf(14) - fm.ascent - fm.descent) / 2 - fm.ascent, mkPaint)
-            cursor += dpf(17)
+            canvas.drawText(mkText, x + padX + (mkW - mkPaint.measureText(mkText)) / 2, cursor + dpf(14) - (dpf(14) - fm.ascent - fm.descent) / 2 - fm.ascent, mkPaint)
+            cursor += dpf(16)
         } else {
             cursor += dpf(2)
         }
 
-        // 教室：白底编号徽章 + 白字后缀
+        // 教室：白底编号徽章 + 白字后缀（显式行高，与下一行文字互不覆盖）
         val locCode = roomCode(course.loc)
         val locRest = course.loc.removePrefix(locCode).trim()
         roomPaint.textSize = dpf(11)
         roomPaint.typeface = Typeface.DEFAULT_BOLD
-        val badgeW = roomPaint.measureText(locCode) + dpf(10)
+        val badgeW = (roomPaint.measureText(locCode) + dpf(10)).toInt()
         val badgeH = dpf(16)
         if (cursor + badgeH <= top + h) {
             val bRect = RectF(x + padX, cursor, x + padX + badgeW, cursor + badgeH)
             canvas.drawRoundRect(bRect, dpf(4), dpf(4), Paint().apply { color = 0xFFF2F2F2.toInt() })
             val fm = roomPaint.fontMetrics
             canvas.drawText(locCode, x + padX + dpf(5), cursor + badgeH - (badgeH - fm.ascent - fm.descent) / 2 - fm.ascent, roomPaint)
-            // 后缀（白字，允许换行受限）
+            // 后缀（白字单行）
             if (locRest.isNotEmpty() && x + padX + badgeW + dpf(4) < x + w - dpf(2)) {
                 val restPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.WHITE; textSize = dpf(9); typeface = Typeface.DEFAULT
@@ -291,15 +295,17 @@ class TimetableView @JvmOverloads constructor(
             cursor += badgeH + dpf(3)
         }
 
-        // 教师
+        // 教师（单行）
         if (course.teacher.isNotBlank() && course.teacher != "未知教师") {
             textPaint.textSize = dpf(10)
-            val tSL = StaticLayout.Builder.obtain(course.teacher, 0, course.teacher.length, textPaint, innerW.toInt())
+            textPaint.typeface = Typeface.DEFAULT
+            val tSL = StaticLayout.Builder.obtain(course.teacher, 0, course.teacher.length, textPaint, innerW)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setMaxLines(1)
                 .build()
-            if (cursor + tSL.height > top + h) return
-            canvas.save(); canvas.translate(x + padX, cursor); tSL.draw(canvas); canvas.restore()
+            if (cursor + tSL.height <= top + h) {
+                canvas.save(); canvas.translate(x + padX, cursor); tSL.draw(canvas); canvas.restore()
+            }
         }
 
         // 编辑模式：上下沿拖拽手柄
