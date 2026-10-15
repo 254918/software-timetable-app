@@ -214,7 +214,7 @@ class TimetableView @JvmOverloads constructor(
         var cursor = top + dpf(6)
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         val roomPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1E293B.toInt() }
-        fun fits(next: Float): Boolean = cursor + next <= contentBottom
+        fun fits(next: Int): Boolean = cursor + next <= contentBottom
 
         // 课程名：正常 13sp 最多 2 行；矮卡片（如 1 节）自动缩到 10sp 单行
         textPaint.textSize = dpf(13)
@@ -268,7 +268,7 @@ class TimetableView @JvmOverloads constructor(
             }
             val mkText = "调课"
             val mkW = minOf((mkPaint.measureText(mkText) + dpf(8)).toInt(), innerW)
-            if (fits(dpf(14))) {
+            if (fits(dpf(14).toInt())) {
                 val mkRect = RectF(x + padX, cursor, x + padX + mkW, cursor + dpf(14))
                 canvas.drawRoundRect(mkRect, dpf(3), dpf(3), Paint().apply { color = 0xFFFDE68A.toInt() })
                 val fm = mkPaint.fontMetrics
@@ -288,7 +288,7 @@ class TimetableView @JvmOverloads constructor(
         val textW = roomPaint.measureText(locCode)
         val badgeW = (textW + dpf(10)).toInt()
         val badgeH = dpf(16)
-        if (fits(badgeH)) {
+        if (fits(badgeH.toInt())) {
             val bRect = RectF(x + padX, cursor, x + padX + badgeW, cursor + badgeH)
             canvas.drawRoundRect(bRect, dpf(4), dpf(4), Paint().apply { color = 0xFFF2F2F2.toInt() })
             val fm = roomPaint.fontMetrics
