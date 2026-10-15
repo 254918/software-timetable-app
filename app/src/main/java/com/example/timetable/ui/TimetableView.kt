@@ -436,10 +436,10 @@ class TimetableView @JvmOverloads constructor(
                 }
 
                 override fun onDrawShadow(canvas: Canvas) {
-                    val color = Timetable.colorOf(t.course.name)
+                    val bg = Timetable.colorOf(t.course.name)
                     canvas.drawRoundRect(
                         RectF(0f, 0f, sw.toFloat(), sh.toFloat()), dpf(8), dpf(8),
-                        Paint().apply { color = color }
+                        Paint().apply { color = bg }
                     )
                     val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.WHITE; textSize = dpf(13); typeface = Typeface.DEFAULT_BOLD
