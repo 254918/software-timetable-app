@@ -53,6 +53,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.weekLabel.setOnClickListener { showWeekPicker() }
 
+        // 速览卡片：点击标题行折叠/展开
+        binding.panelHeader.setOnClickListener { toggleOverview() }
+
         binding.timetable.onCourseClick = { course, sess ->
             openCourseEdit(course, sess)
         }
@@ -121,6 +124,27 @@ class MainActivity : AppCompatActivity() {
         binding.editPanel.visibility = if (editMode) View.VISIBLE else View.GONE
         binding.timetable.editMode = editMode
         if (editMode) rebuildCourseList()
+        // 进入编辑模式：速览默认折叠，给课表腾出空间；退出时恢复展开
+        if (editMode) {
+            overviewCollapsed = true
+        } else {
+            overviewCollapsed = false
+        }
+        applyOverviewState()
+    }
+
+    // ===== 速览折叠 =====
+
+    private var overviewCollapsed = false
+
+    private fun toggleOverview() {
+        overviewCollapsed = !overviewCollapsed
+        applyOverviewState()
+    }
+
+    private fun applyOverviewState() {
+        binding.weekPanel.visibility = if (overviewCollapsed) View.GONE else View.VISIBLE
+        binding.panelArrow.text = if (overviewCollapsed) "▸" else "▾"
     }
 
     /** 课程拖拽列表：去重后的课程名，长按拖到课表 */
