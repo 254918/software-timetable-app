@@ -40,12 +40,15 @@ class TimetableView @JvmOverloads constructor(
     var onCourseClick: ((Course, Session) -> Unit)? = null
     /** 拖拽添加：从课程列表拖入到课表某天某节 */
     var onDropAdd: ((name: String, day: Int, start: Int, end: Int) -> Unit)? = null
+    /** 拖到 0 节槽：表示该天不上该课（从课表移除该课程当天记录） */
+    var onDropZero: ((name: String, day: Int) -> Unit)? = null
     /** 卡片上下沿拖拽调整节次完成 */
     var onResizeCommit: ((course: Course, sess: Session, newStart: Int, newEnd: Int) -> Unit)? = null
 
-    /** 编辑模式：显示拖拽手柄、接收拖入、允许调整节次 */
+    /** 编辑模式：显示拖拽手柄、0 节拖放槽、接收拖入、允许调整节次 */
     var editMode: Boolean = false
         set(value) {
+            if (field != value) requestLayout()
             field = value
             invalidate()
         }
@@ -67,10 +70,13 @@ class TimetableView @JvmOverloads constructor(
     private val periodW = dp(48)
     private val headH = dp(44)
     private val rowH = dp(52)
+    /** 编辑模式顶部 0 节拖放槽的高度 */
+    private val zeroSlotH = dp(36)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, rowH * 13 + pad * 2)
+        val topSpace = if (editMode) zeroSlotH else pad
+        setMeasuredDimension(w, rowH * 13 + topSpace + pad)
     }
 
     private fun dayWidth(): Float {
@@ -78,7 +84,7 @@ class TimetableView @JvmOverloads constructor(
         return (w - pad * 2 - periodW) / 5f
     }
 
-    private fun gridTop(): Float = pad.toFloat()
+    private fun gridTop(): Float = (if (editMode) zeroSlotH else pad).toFloat()
 
     private fun dayFromX(x: Float): Int {
         val dayW = dayWidth()
@@ -87,7 +93,9 @@ class TimetableView @JvmOverloads constructor(
     }
 
     private fun periodFromY(y: Float): Int {
-        val v = ((y - gridTop()) / rowH).toInt() + 1
+        val g = gridTop()
+        if (y < g) return if (editMode) 0 else 1
+        val v = ((y - g) / rowH).toInt() + 1
         return v.coerceIn(1, 13)
     }
 
@@ -111,6 +119,35 @@ class TimetableView @JvmOverloads constructor(
         canvas.drawColor(0xFFF8FAFC.toInt())
         // 节次列背景
         canvas.drawRect(pad.toFloat(), y0, pad + periodW.toFloat(), bottom, Paint().apply { color = 0xFFF1F5F9.toInt() })
+
+        // 编辑模式：顶部 0 节拖放槽（拖入课程到此处 = 该天不上该课）
+        if (editMode) {
+            val active = dragTargetVisible && dragPeriod == 0
+            val zRect = RectF(pad.toFloat(), dpf(4), pad + periodW + dayW * 5, y0 - dpf(4))
+            canvas.drawRoundRect(
+                zRect, dpf(6), dpf(6),
+                Paint().apply { color = if (active) 0xFFFEE2E2.toInt() else 0xFFF1F5F9.toInt() }
+            )
+            val zStroke = Paint().apply {
+                color = if (active) 0xFFEF4444.toInt() else 0xFFCBD5E1.toInt()
+                style = Paint.Style.STROKE
+                strokeWidth = dpf(1)
+                isAntiAlias = true
+            }
+            canvas.drawRoundRect(zRect, dpf(6), dpf(6), zStroke)
+            val zp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (active) 0xFFDC2626.toInt() else 0xFF94A3B8.toInt()
+                textSize = dpf(10)
+                typeface = Typeface.DEFAULT_BOLD
+                textAlign = Paint.Align.CENTER
+            }
+            val zFm = zp.fontMetrics
+            val zCy = zRect.centerY() - (zFm.ascent + zFm.descent) / 2
+            canvas.drawText(
+                if (active) "松开 = 0 节：该天不上该课" else "0 节槽：把课程拖到这里 = 该天不上该课",
+                pad + periodW / 2 + dayW * 5 / 2, zCy, zp
+            )
+        }
 
         // 表头
         val headPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -480,7 +517,9 @@ class TimetableView @JvmOverloads constructor(
                         ?: return@setOnDragListener false
                     val day = dayFromX(e.x)
                     val p = periodFromY(e.y)
-                    if (day in 1..5 && p in 1..13) {
+                    if (day in 1..5 && p == 0) {
+                        onDropZero?.invoke(name, day)
+                    } else if (day in 1..5 && p in 1..13) {
                         onDropAdd?.invoke(name, day, p, p)
                     }
                     true

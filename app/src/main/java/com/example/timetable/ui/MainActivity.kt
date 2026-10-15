@@ -72,6 +72,9 @@ class MainActivity : AppCompatActivity() {
             lastDroppedName = name
             showDropDialog(day, start, end)
         }
+        binding.timetable.onDropZero = { name, day ->
+            removeDroppedCourse(name, day)
+        }
         binding.timetable.onResizeCommit = { course, sess, newStart, newEnd ->
             commitResize(course, sess, newStart, newEnd)
         }
@@ -319,6 +322,20 @@ class MainActivity : AppCompatActivity() {
         render()
         rebuildCourseList()
         Toast.makeText(this, "已添加（待保存）：${Timetable.DAY_NAMES[day - 1]} $ns-$ne 节", Toast.LENGTH_SHORT).show()
+    }
+
+    /** 拖入 0 节槽：该天不上该课，从草稿移除该课程当天记录（点保存才生效） */
+    private fun removeDroppedCourse(name: String, day: Int) {
+        val draft = editDraft ?: return
+        val idx = draft.indexOfFirst { it.name == name && it.day == day }
+        if (idx < 0) {
+            Toast.makeText(this, "${Timetable.DAY_NAMES[day - 1]} 没有这门课，无需移除", Toast.LENGTH_SHORT).show()
+            return
+        }
+        draft.removeAt(idx)
+        render()
+        rebuildCourseList()
+        Toast.makeText(this, "已设为0节（待保存）：${Timetable.DAY_NAMES[day - 1]} 不上「$name」", Toast.LENGTH_SHORT).show()
     }
 
     /** 记录最近一次拖入的课程名（onDropAdd 弹窗确认前暂存） */
