@@ -301,8 +301,11 @@ class MainActivity : AppCompatActivity() {
         val teacher = proto?.teacher ?: "未知教师"
         val classes = proto?.classes
 
+        // 防御：节次必须 1..13 且 start<=end，杜绝 0 节/倒序
+        val ns = start.coerceIn(1, 13)
+        val ne = end.coerceIn(ns, 13)
         val idx = draft.indexOfFirst { it.name == name && it.day == day }
-        val newSess = Session(weeks, start, end)
+        val newSess = Session(weeks, ns, ne)
         if (idx >= 0) {
             val old = draft[idx]
             val exists = old.sessions.any { it.weeks == weeks }
@@ -315,7 +318,7 @@ class MainActivity : AppCompatActivity() {
         }
         render()
         rebuildCourseList()
-        Toast.makeText(this, "已添加（待保存）：${Timetable.DAY_NAMES[day - 1]} $start-$end 节", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "已添加（待保存）：${Timetable.DAY_NAMES[day - 1]} $ns-$ne 节", Toast.LENGTH_SHORT).show()
     }
 
     /** 记录最近一次拖入的课程名（onDropAdd 弹窗确认前暂存） */
@@ -323,23 +326,26 @@ class MainActivity : AppCompatActivity() {
 
     /** 卡片上下沿拖拽调整节次完成：只改草稿，点保存才生效 */
     private fun commitResize(course: Course, sess: Session, newStart: Int, newEnd: Int) {
-        if (newStart == sess.start && newEnd == sess.end) return
+        // 防御：节次必须 1..13 且 start<=end，杜绝 0 节/倒序
+        val ns = newStart.coerceIn(1, 13)
+        val ne = newEnd.coerceIn(ns, 13)
+        if (ns == sess.start && ne == sess.end) return
         val draft = editDraft ?: return
         var changed = false
         for (i in draft.indices) {
             val c = draft[i]
             if (c.name != course.name || c.day != course.day) continue
-            val ns = c.sessions.map { s ->
+            val ns2 = c.sessions.map { s ->
                 if (s.weeks == sess.weeks && s.start == sess.start && s.end == sess.end) {
                     changed = true
-                    s.copy(start = newStart, end = newEnd)
+                    s.copy(start = ns, end = ne)
                 } else s
             }
-            draft[i] = c.copy(sessions = ns)
+            draft[i] = c.copy(sessions = ns2)
         }
         if (changed) {
             render()
-            Toast.makeText(this, "已调整为 $newStart-$newEnd 节（待保存）", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "已调整为 $ns-$ne 节（待保存）", Toast.LENGTH_SHORT).show()
         }
     }
 

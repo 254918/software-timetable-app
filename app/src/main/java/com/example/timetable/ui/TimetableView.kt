@@ -207,26 +207,38 @@ class TimetableView @JvmOverloads constructor(
         // 卡片主体
         canvas.drawRoundRect(rect, dpf(8), dpf(8), Paint().apply { color = cardColor })
 
-        // 内容区（留 padding）。行高一律用 fontMetrics 显式计算，杜绝重叠
+        // 内容区：任何一块放不下就跳过该块，绝不 return，保证拖拽手柄与点击区域永远存在
         val padX = dpf(6)
         val innerW = (w - padX * 2).toInt()
+        val contentBottom = top + h - dpf(4)
         var cursor = top + dpf(6)
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         val roomPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1E293B.toInt() }
+        fun fits(next: Float): Boolean = cursor + next <= contentBottom
 
-        fun lineHeight(p: TextPaint): Float = p.fontMetrics.let { it.descent - it.ascent }
-
-        // 课程名（最多 2 行）
+        // 课程名：正常 13sp 最多 2 行；矮卡片（如 1 节）自动缩到 10sp 单行
         textPaint.textSize = dpf(13)
         textPaint.typeface = Typeface.DEFAULT_BOLD
-        val nameSL = StaticLayout.Builder.obtain(course.name, 0, course.name.length, textPaint, innerW)
+        var nameSL = StaticLayout.Builder.obtain(course.name, 0, course.name.length, textPaint, innerW)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setMaxLines(2)
             .setEllipsize(TextUtils.TruncateAt.END)
             .build()
-        if (cursor + nameSL.height > top + h) return
-        canvas.save(); canvas.translate(x + padX, cursor); nameSL.draw(canvas); canvas.restore()
-        cursor += nameSL.height + dpf(2)
+        val avail = contentBottom - cursor
+        if (nameSL.height > avail) {
+            textPaint.textSize = dpf(10)
+            nameSL = StaticLayout.Builder.obtain(course.name, 0, course.name.length, textPaint, innerW)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setMaxLines(1)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .build()
+        }
+        if (fits(nameSL.height)) {
+            canvas.save(); canvas.translate(x + padX, cursor); nameSL.draw(canvas); canvas.restore()
+            cursor += nameSL.height + dpf(2)
+        } else {
+            cursor += dpf(2)
+        }
 
         // 节次·周次（完整显示不省略，超高自动换行，两行放不下则缩小字号）
         textPaint.textSize = dpf(10)
@@ -242,9 +254,12 @@ class TimetableView @JvmOverloads constructor(
             wSize -= dpf(0.5f)
             textPaint.textSize = wSize
         }
-        if (cursor + timeSL.height > top + h) return
-        canvas.save(); canvas.translate(x + padX, cursor); timeSL.draw(canvas); canvas.restore()
-        cursor += timeSL.height + dpf(2)
+        if (fits(timeSL.height)) {
+            canvas.save(); canvas.translate(x + padX, cursor); timeSL.draw(canvas); canvas.restore()
+            cursor += timeSL.height + dpf(2)
+        } else {
+            cursor += dpf(2)
+        }
 
         // 调课徽章
         if (sess.makeup) {
@@ -253,17 +268,19 @@ class TimetableView @JvmOverloads constructor(
             }
             val mkText = "调课"
             val mkW = minOf((mkPaint.measureText(mkText) + dpf(8)).toInt(), innerW)
-            val mkRect = RectF(x + padX, cursor, x + padX + mkW, cursor + dpf(14))
-            canvas.drawRoundRect(mkRect, dpf(3), dpf(3), Paint().apply { color = 0xFFFDE68A.toInt() })
-            val fm = mkPaint.fontMetrics
-            val mkBaseline = cursor + dpf(14) / 2f - (fm.ascent + fm.descent) / 2f
-            canvas.drawText(mkText, x + padX + (mkW - mkPaint.measureText(mkText)) / 2, mkBaseline, mkPaint)
+            if (fits(dpf(14))) {
+                val mkRect = RectF(x + padX, cursor, x + padX + mkW, cursor + dpf(14))
+                canvas.drawRoundRect(mkRect, dpf(3), dpf(3), Paint().apply { color = 0xFFFDE68A.toInt() })
+                val fm = mkPaint.fontMetrics
+                val mkBaseline = cursor + dpf(14) / 2f - (fm.ascent + fm.descent) / 2f
+                canvas.drawText(mkText, x + padX + (mkW - mkPaint.measureText(mkText)) / 2, mkBaseline, mkPaint)
+            }
             cursor += dpf(16)
         } else {
             cursor += dpf(2)
         }
 
-        // 教室：白底编号徽章 + 白字后缀（显式行高，与下一行文字互不覆盖）
+        // 教室：白底编号徽章 + 白字后缀
         val locCode = roomCode(course.loc)
         val locRest = course.loc.removePrefix(locCode).trim()
         roomPaint.textSize = dpf(11)
@@ -271,7 +288,7 @@ class TimetableView @JvmOverloads constructor(
         val textW = roomPaint.measureText(locCode)
         val badgeW = (textW + dpf(10)).toInt()
         val badgeH = dpf(16)
-        if (cursor + badgeH <= top + h) {
+        if (fits(badgeH)) {
             val bRect = RectF(x + padX, cursor, x + padX + badgeW, cursor + badgeH)
             canvas.drawRoundRect(bRect, dpf(4), dpf(4), Paint().apply { color = 0xFFF2F2F2.toInt() })
             val fm = roomPaint.fontMetrics
@@ -306,12 +323,12 @@ class TimetableView @JvmOverloads constructor(
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setMaxLines(1)
                 .build()
-            if (cursor + tSL.height <= top + h) {
+            if (fits(tSL.height)) {
                 canvas.save(); canvas.translate(x + padX, cursor); tSL.draw(canvas); canvas.restore()
             }
         }
 
-        // 编辑模式：上下沿拖拽手柄
+        // 编辑模式：上下沿拖拽手柄（无条件绘制，矮卡片也保留）
         if (editMode) {
             val handlePaint = Paint().apply { color = 0x66FFFFFF.toInt() }
             val hx0 = x + dpf(10)
@@ -328,7 +345,7 @@ class TimetableView @JvmOverloads constructor(
             )
         }
 
-        // 点击区域记录
+        // 点击区域记录（无条件记录，保证矮卡片也能点中）
         tapTargets = tapTargets.orEmpty() + TapTarget(rect, course, sess)
     }
 
@@ -357,13 +374,21 @@ class TimetableView @JvmOverloads constructor(
         val targets = tapTargets ?: return null
         val hh = dp(16).toFloat()
         for (t in targets) {
-            if (t.rect.contains(x, y)) {
-                if (y <= t.rect.top + hh) {
-                    return ResizeState(t.course, t.sess, 0, t.sess.start, t.sess.end)
+            if (!t.rect.contains(x, y)) continue
+            val rectH = t.rect.height()
+            if (rectH <= hh * 2) {
+                // 矮卡片（如拖成 1 节时）：上半=改开始，下半=改结束，避免中部盲区导致拖不动
+                return if (y < t.rect.centerY()) {
+                    ResizeState(t.course, t.sess, 0, t.sess.start, t.sess.end)
+                } else {
+                    ResizeState(t.course, t.sess, 1, t.sess.start, t.sess.end)
                 }
-                if (y >= t.rect.bottom - hh) {
-                    return ResizeState(t.course, t.sess, 1, t.sess.start, t.sess.end)
-                }
+            }
+            if (y <= t.rect.top + hh) {
+                return ResizeState(t.course, t.sess, 0, t.sess.start, t.sess.end)
+            }
+            if (y >= t.rect.bottom - hh) {
+                return ResizeState(t.course, t.sess, 1, t.sess.start, t.sess.end)
             }
         }
         return null
