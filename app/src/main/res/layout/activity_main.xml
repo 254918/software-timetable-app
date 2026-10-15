@@ -117,8 +117,9 @@
             android:background="@drawable/bg_chip_primary" />
     </LinearLayout>
 
-    <!-- 本周速览 -->
+    <!-- 本周速览（标题行可点击折叠/展开） -->
     <LinearLayout
+        android:id="@+id/overviewCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -126,23 +127,44 @@
         android:layout_marginLeft="8dp"
         android:layout_marginRight="8dp"
         android:layout_marginBottom="4dp"
-        android:padding="12dp">
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp">
 
-        <TextView
-            android:id="@+id/panelTitle"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/panelHeader"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="本周课程速览"
-            android:textColor="@color/ink2"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/panelTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="本周课程速览"
+                android:textColor="@color/ink2"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/panelArrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▾"
+                android:textColor="@color/ink2"
+                android:textSize="13sp" />
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/weekPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="6dp" />
+            android:paddingBottom="8dp" />
     </LinearLayout>
 
     <!-- 课表 + 编辑面板（垂直排布，编辑面板不遮挡课表） -->
