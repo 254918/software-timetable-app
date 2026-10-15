@@ -67,7 +67,8 @@ class MainActivity : AppCompatActivity() {
 
         binding.timetable.onCourseClick = { course, sess ->
             openCourseEdit(course, sess)
-        }        binding.timetable.onDropAdd = { name, day, start, end ->
+        }
+        binding.timetable.onDropAdd = { name, day, start, end ->
             lastDroppedName = name
             showDropDialog(day, start, end)
         }
