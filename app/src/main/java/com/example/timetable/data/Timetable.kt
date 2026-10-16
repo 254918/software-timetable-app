@@ -57,6 +57,24 @@ object Timetable {
         return course.sessions.firstOrNull { week in parseWeeks(it.weeks) }
     }
 
+    /** 从周次表达式中移除某一周，返回新的表达式；若移除后为空返回 ""（表示该课不再上课） */
+    fun weeksWithout(expr: String, w: Int): String {
+        val set = parseWeeks(expr)
+        if (w !in set) return expr.trim()
+        set.remove(w)
+        if (set.isEmpty()) return ""
+        val list = set.sorted()
+        val parts = ArrayList<String>()
+        var i = 0
+        while (i < list.size) {
+            var j = i
+            while (j + 1 < list.size && list[j + 1] == list[j] + 1) j++
+            parts.add(if (j == i) "${list[i]}" else "${list[i]}-${list[j]}")
+            i = j + 1
+        }
+        return parts.joinToString(",")
+    }
+
     /** 某周某天要上的课 */
     fun coursesOfDay(courses: List<Course>, week: Int, day: Int): List<Pair<Course, Session>> {
         return courses

@@ -341,7 +341,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "已设为0节（待保存）：${Timetable.DAY_NAMES[day - 1]} 不上「$name」", Toast.LENGTH_SHORT).show()
     }
 
-    /** 长按卡片拖到 0 节槽：删除本节课（该 Session），点保存才生效 */
+    /** 长按卡片拖到 0 节槽：删除当前周的这节课，点保存才生效（只影响本周，其余周保留） */
     private fun removeSession(name: String, day: Int, weeks: String, start: Int, end: Int) {
         val draft = editDraft ?: return
         val idx = draft.indexOfFirst { it.name == name && it.day == day }
@@ -350,13 +350,21 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val c = draft[idx]
-        val remain = c.sessions.filterNot {
-            it.weeks == weeks && it.start == start && it.end == end
-        }
+        // 只从周次中移除当前周；移空则整个删除
+        val newWeeks = Timetable.weeksWithout(weeks, week)
+        val remain = c.sessions.map { s ->
+            if (s.weeks == weeks && s.start == start && s.end == end) {
+                if (newWeeks.isEmpty()) null else s.copy(weeks = newWeeks)
+            } else s
+        }.filterNotNull()
         if (remain.isEmpty()) draft.removeAt(idx) else draft[idx] = c.copy(sessions = remain)
         render()
         rebuildCourseList()
-        Toast.makeText(this, "已删除本节课（待保存）：${Timetable.DAY_NAMES[day - 1]}「$name」", Toast.LENGTH_SHORT).show()
+        if (newWeeks.isEmpty()) {
+            Toast.makeText(this, "本周已删除，且无剩余周次，整课移除（待保存）", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "已删除本周的这节课，其余周保留（待保存）：${Timetable.DAY_NAMES[day - 1]}「$name」", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** 记录最近一次拖入的课程名（onDropAdd 弹窗确认前暂存） */
@@ -479,6 +487,7 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra("course_json", courseToJson(course, sess))
         // 编辑模式：返回结果由 MainActivity 更新草稿；非编辑模式：直接写存储
         intent.putExtra("commit_store", !editMode)
+        intent.putExtra("current_week", week)
         startActivityForResult(intent, REQ_EDIT_COURSE)
     }
 
@@ -495,19 +504,22 @@ class MainActivity : AppCompatActivity() {
             val oldStart = o.optInt("old_start", 1)
             val oldEnd = o.optInt("old_end", 1)
 
-            // 编辑页点了「删除本节课」：从草稿移除该节课（点保存才生效）
+            // 编辑页点了「删除本节课」：只从草稿移除当前周的这节课（点保存才生效，其余周保留）
             if (o.optBoolean("delete_session", false)) {
                 val idx = draft.indexOfFirst { it.name == oldName && it.day == oldDay }
                 if (idx >= 0) {
                     val c = draft[idx]
-                    val remain = c.sessions.filterNot {
-                        it.weeks == oldWeeks && it.start == oldStart && it.end == oldEnd
-                    }
+                    val newWeeks = Timetable.weeksWithout(oldWeeks, week)
+                    val remain = c.sessions.map { s ->
+                        if (s.weeks == oldWeeks && s.start == oldStart && s.end == oldEnd) {
+                            if (newWeeks.isEmpty()) null else s.copy(weeks = newWeeks)
+                        } else s
+                    }.filterNotNull()
                     if (remain.isEmpty()) draft.removeAt(idx) else draft[idx] = c.copy(sessions = remain)
                 }
                 render()
                 rebuildCourseList()
-                Toast.makeText(this, "已删除本节课（待保存）", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "已删除本周的这节课，其余周保留（待保存）", Toast.LENGTH_SHORT).show()
                 return
             }
             val idx = draft.indexOfFirst { it.name == oldName && it.day == oldDay }

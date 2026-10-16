@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -581,6 +582,12 @@ class TimetableView @JvmOverloads constructor(
                 DragEvent.ACTION_DRAG_LOCATION -> {
                     dragDay = dayFromX(e.x)
                     dragPeriod = periodFromY(e.y)
+                    // 拖到接近课表顶部时，自动向上滚动父级，让 0 节槽可见
+                    if (e.y < dp(90).toFloat() && SystemClock.uptimeMillis() - lastAutoScroll > 120) {
+                        lastAutoScroll = SystemClock.uptimeMillis()
+                        val sv = parent as? androidx.core.widget.NestedScrollView
+                        if (sv != null && sv.scrollY > 0) sv.smoothScrollBy(0, -dp(220))
+                    }
                     invalidate()
                     true
                 }
@@ -595,11 +602,13 @@ class TimetableView @JvmOverloads constructor(
                     if (text.startsWith("sess:")) {
                         // 长按卡片拖拽：拖到 0 节槽 = 删除本节课
                         val parts = text.removePrefix("sess:").split("|")
-                        if (parts.size >= 5 && day in 1..5 && p == 0) {
+                        if (parts.size >= 5 && p == 0) {
+                            // 用卡片原所在天匹配（拖到槽的不同横向位置不应改变目标天）
+                            val sday = parts[1].toIntOrNull() ?: day
                             val wks = parts[2]
                             val s = parts[3].toIntOrNull() ?: 1
                             val en = parts[4].toIntOrNull() ?: 1
-                            onDropSession?.invoke(parts[0], day, wks, s, en)
+                            onDropSession?.invoke(parts[0], sday, wks, s, en)
                         }
                         // 拖到课表其他位置：暂不支持移动，忽略
                     } else {
@@ -626,4 +635,5 @@ class TimetableView @JvmOverloads constructor(
     private var dragTargetVisible = false
     private var dragDay = -1
     private var dragPeriod = -1
+    private var lastAutoScroll = 0L
 }

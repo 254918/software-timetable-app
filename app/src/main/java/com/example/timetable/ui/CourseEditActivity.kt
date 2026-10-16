@@ -122,18 +122,22 @@ class CourseEditActivity : AppCompatActivity() {
                 finish()
                 return@setOnClickListener
             }
-            // 非编辑模式：直接删除本节课并保存
+            // 非编辑模式：直接删除本节课并保存（只删当前周，其余周保留）
+            val currentWeek = intent.getIntExtra("current_week", 1)
             val courses = store.loadCourses().toMutableList()
             val idx = courses.indexOfFirst { it.name == o.optString("name") && it.day == o.optInt("day", 1) }
             if (idx >= 0) {
                 val c = courses[idx]
-                val remain = c.sessions.filterNot {
-                    it.weeks == o.optString("weeks") && it.start == o.optInt("start") && it.end == o.optInt("end")
-                }
+                val newWeeks = Timetable.weeksWithout(o.optString("weeks"), currentWeek)
+                val remain = c.sessions.map { s ->
+                    if (s.weeks == o.optString("weeks") && s.start == o.optInt("start") && s.end == o.optInt("end")) {
+                        if (newWeeks.isEmpty()) null else s.copy(weeks = newWeeks)
+                    } else s
+                }.filterNotNull()
                 if (remain.isEmpty()) courses.removeAt(idx) else courses[idx] = c.copy(sessions = remain)
                 store.saveCourses(courses)
             }
-            Toast.makeText(this, "已删除本节课", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "已删除本周的这节课", Toast.LENGTH_SHORT).show()
             finish()
         }
     }
