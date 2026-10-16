@@ -59,7 +59,7 @@ object Timetable {
 
     /** 从周次表达式中移除某一周，返回新的表达式；若移除后为空返回 ""（表示该课不再上课） */
     fun weeksWithout(expr: String, w: Int): String {
-        val set = parseWeeks(expr)
+        val set = parseWeeks(expr).toMutableSet()
         if (w !in set) return expr.trim()
         set.remove(w)
         if (set.isEmpty()) return ""
