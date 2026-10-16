@@ -141,7 +141,7 @@ class TimetableStore(private val context: Context) {
                                 start = so.getInt("start"),
                                 end = so.getInt("end"),
                                 makeup = so.optBoolean("makeup", false),
-                                note = so.optString("note").takeIf { !it.isNullOrBlank() }
+                                note = so.optString("note")
                             )
                         } catch (e: Exception) {
                             null
@@ -150,9 +150,9 @@ class TimetableStore(private val context: Context) {
                     Course(
                         name = o.optString("name", "").ifBlank { return@mapNotNull null },
                         day = o.optInt("day", 1),
-                        classes = o.optString("classes").takeIf { !it.isNullOrBlank() },
-                        loc = o.optString("loc").takeIf { !it.isNullOrBlank() },
-                        teacher = o.optString("teacher").takeIf { !it.isNullOrBlank() },
+                        classes = o.optString("classes").takeIf { it.isNotBlank() },
+                        loc = o.optString("loc"),
+                        teacher = o.optString("teacher"),
                         sessions = sessions
                     )
                 } catch (e: Exception) {
