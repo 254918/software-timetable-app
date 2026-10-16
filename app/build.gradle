@@ -1,7 +1,13 @@
 plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
+    id 'com.android.application' version '7.2.1'
+    id 'org.jetbrains.kotlin.android' version '1.6.21'
 }
+
+// versionCode 必须单调递增，否则部分手机安装器会把覆盖安装当成冲突提示、要求卸载重装（卸载会清空课表数据！）
+// GitHub Actions 用构建序号自动递增；本地默认 1
+def _versionCode = (System.getenv('TIMETABLE_VERSION_CODE') ?: '1') as int
+// 语义化版本名：GitHub Actions 手动触发时可从 TIMETABLE_VERSION_NAME 传入（如 1.4.4），本地默认 1.4.4
+def _versionName = System.getenv('TIMETABLE_VERSION_NAME') ?: "1.4.4"
 
 android {
     namespace 'com.example.timetable'
@@ -11,11 +17,8 @@ android {
         applicationId "com.example.timetable"
         minSdk 24
         targetSdk 33
-        // versionCode 必须单调递增，否则部分手机安装器会把覆盖安装当成冲突提示、要求卸载重装（卸载会清空课表数据！）
-        // GitHub Actions 用构建序号自动递增；本地默认 1
-        versionCode (System.getenv('TIMETABLE_VERSION_CODE') ?: '1').toInteger()
-        // 语义化版本名：GitHub Actions 手动触发时可从 TIMETABLE_VERSION_NAME 传入（如 1.4.4），本地默认 1.4.4
-        versionName System.getenv('TIMETABLE_VERSION_NAME') ?: "1.4.4"
+        versionCode _versionCode
+        versionName _versionName
     }
 
     signingConfigs {
