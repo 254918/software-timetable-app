@@ -12,7 +12,8 @@ android {
         minSdk 24
         targetSdk 33
         versionCode 1
-        versionName "1.0.0"
+        // 语义化版本名：GitHub Actions 手动触发时可从 TIMETABLE_VERSION_NAME 传入（如 1.4.4），本地默认 1.4.4
+        versionName System.getenv('TIMETABLE_VERSION_NAME') ?: "1.4.4"
     }
 
     signingConfigs {

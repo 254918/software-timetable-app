@@ -582,11 +582,15 @@ class TimetableView @JvmOverloads constructor(
                 DragEvent.ACTION_DRAG_LOCATION -> {
                     dragDay = dayFromX(e.x)
                     dragPeriod = periodFromY(e.y)
-                    // 拖到接近课表顶部时，自动向上滚动父级，让 0 节槽可见
-                    if (e.y < dp(90).toFloat() && SystemClock.uptimeMillis() - lastAutoScroll > 120) {
+                    // 拖到接近屏幕顶部时，自动向上滚动父级，让 0 节槽可见
+                    // e.y 是相对本 View 的坐标，减去已滚动量才是屏幕上的位置
+                    val sv = parent as? androidx.core.widget.NestedScrollView
+                    val onScreenY = e.y - (sv?.scrollY ?: 0)
+                    if (sv != null && sv.scrollY > 0 && onScreenY < dp(90).toFloat()
+                        && SystemClock.uptimeMillis() - lastAutoScroll > 400
+                    ) {
                         lastAutoScroll = SystemClock.uptimeMillis()
-                        val sv = parent as? androidx.core.widget.NestedScrollView
-                        if (sv != null && sv.scrollY > 0) sv.smoothScrollBy(0, -dp(220))
+                        sv.smoothScrollTo(0, 0)
                     }
                     invalidate()
                     true
