@@ -45,7 +45,23 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
         binding.btnEdit.setOnClickListener {
-            if (editMode) exitEditMode(commit = false) else enterEditMode()
+            if (editMode) {
+                val draft = editDraft
+                // 有未保存修改时点「完成」：先确认，防止误点丢失本次改动
+                if (draft != null && draft != courses) {
+                    AlertDialog.Builder(this)
+                        .setTitle("有未保存的修改")
+                        .setMessage("课表还有未保存的改动，退出会丢失。要保存后退出吗？")
+                        .setPositiveButton("保存并退出") { _, _ -> exitEditMode(true) }
+                        .setNegativeButton("不保存退出") { _, _ -> exitEditMode(false) }
+                        .setNeutralButton("取消", null)
+                        .show()
+                } else {
+                    exitEditMode(commit = false)
+                }
+            } else {
+                enterEditMode()
+            }
         }
         binding.btnSaveEdit.setOnClickListener { exitEditMode(commit = true) }
         binding.btnDiscardEdit.setOnClickListener { exitEditMode(commit = false) }

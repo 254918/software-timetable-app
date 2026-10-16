@@ -46,6 +46,7 @@ jobs:
       - name: Set version env
         run: |
           echo "TIMETABLE_VERSION_NAME=${{ github.event.inputs.version || '1.4.4' }}" >> "$GITHUB_ENV"
+          echo "TIMETABLE_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
 
       - name: Build APKs
         run: |
