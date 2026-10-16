@@ -34,8 +34,10 @@ class TimetableStore(private val context: Context) {
             o.put("name", c.name)
             o.put("day", c.day)
             if (c.classes != null) o.put("classes", c.classes)
-            o.put("loc", c.loc)
-            o.put("teacher", c.teacher)
+            // 空值也写入空字符串而不是移除键：否则 org.json 会删除该键，
+            // 加载时 getString 抛异常导致整份课表解析失败、被内置课表覆盖
+            o.put("loc", c.loc ?: "")
+            o.put("teacher", c.teacher ?: "")
             o.put("sessions", sArr)
             arr.put(o)
         }
@@ -126,27 +128,36 @@ class TimetableStore(private val context: Context) {
     private fun parseCourses(raw: String): List<Course> {
         return try {
             val arr = JSONArray(raw)
+            // 逐条容错：某一条课程数据异常只跳过该条，绝不让整份课表解析失败（否则会被内置课表覆盖）
             (0 until arr.length()).mapNotNull { i ->
-                val o = arr.getJSONObject(i)
-                val sArr = o.getJSONArray("sessions")
-                val sessions = (0 until sArr.length()).map { j ->
-                    val so = sArr.getJSONObject(j)
-                    Session(
-                        weeks = so.getString("weeks"),
-                        start = so.getInt("start"),
-                        end = so.getInt("end"),
-                        makeup = so.optBoolean("makeup", false),
-                        note = so.optString("note", null).ifBlank { null }
+                try {
+                    val o = arr.getJSONObject(i)
+                    val sArr = o.optJSONArray("sessions") ?: return@mapNotNull null
+                    val sessions = (0 until sArr.length()).mapNotNull { j ->
+                        try {
+                            val so = sArr.getJSONObject(j)
+                            Session(
+                                weeks = so.getString("weeks"),
+                                start = so.getInt("start"),
+                                end = so.getInt("end"),
+                                makeup = so.optBoolean("makeup", false),
+                                note = so.optString("note", null).ifBlank { null }
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    Course(
+                        name = o.optString("name", "").ifBlank { return@mapNotNull null },
+                        day = o.optInt("day", 1),
+                        classes = o.optString("classes", null).ifBlank { null },
+                        loc = o.optString("loc", null).ifBlank { null },
+                        teacher = o.optString("teacher", null).ifBlank { null },
+                        sessions = sessions
                     )
+                } catch (e: Exception) {
+                    null
                 }
-                Course(
-                    name = o.getString("name"),
-                    day = o.getInt("day"),
-                    classes = o.optString("classes", null).ifBlank { null },
-                    loc = o.getString("loc"),
-                    teacher = o.getString("teacher"),
-                    sessions = sessions
-                )
             }
         } catch (e: Exception) {
             emptyList()
